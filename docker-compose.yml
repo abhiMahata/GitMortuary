@@ -14,7 +14,7 @@ services:
       - namenode_data:/hadoop/dfs/name
 
   datanode:
-    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: git pattern-datanode
     environment:
       - SERVICES_DEPENDENCIES=namenode:9870
