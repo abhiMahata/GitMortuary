@@ -2,7 +2,7 @@ services:
 
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
-    container_name: gitpattern-namenode
+    #container_name: gitpattern-namenode
     environment:
       - CLUSTER_NAME=git-pattern-cluster
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
@@ -15,7 +15,7 @@ services:
 
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: git pattern-datanode
+    #container_name: git pattern-datanode
     environment:
       - SERVICES_DEPENDENCIES=namenode:9870
       - CORE_CONF_fs_defaultFS=hdfs://namenode:9000
