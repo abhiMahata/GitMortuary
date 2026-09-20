@@ -30,7 +30,7 @@ def discover_repositories():
 
     response = requests.get(
         f"{GITHUB_API}/search/repositories",
-        headers = github.headers(),
+        headers = github_headers(),
         params = params,
         timeout = 30,
     )
