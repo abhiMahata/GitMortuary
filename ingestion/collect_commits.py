@@ -7,7 +7,7 @@ import requests
 from config import (
     GITHUB_API,
     GITHUB_TOKEN,
-    COMMITS_OUTPUT_FILE,
+    COMMIT_OUTPUT_FILE,
     MAX_COMMITS_PER_REPO,
     OUTPUT_FILE,
 )
@@ -81,7 +81,7 @@ def normalize_commit(repo, commit):
 
 
 def save_commits(commits):
-    output_path = Path(COMMITS_OUTPUT_FILE)
+    output_path = Path(COMMIT_OUTPUT_FILE)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with output_path.open("w", encoding="utf-8") as file:
@@ -111,7 +111,7 @@ def main():
 
         print()
         print(f"Collected {len(all_commits)} commits.")
-        print(f"Saved to: {COMMITS_OUTPUT_FILE}")
+        print(f"Saved to: {COMMIT_OUTPUT_FILE}")
 
     except requests.HTTPError as error:
         print(f"GitHub API error: {error}")
