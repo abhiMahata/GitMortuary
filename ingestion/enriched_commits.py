@@ -7,7 +7,7 @@ import requests
 from config import (
     GITHUB_API,
     GITHUB_TOKEN,
-    COMMITS_OUTPUT_FILE,
+    COMMIT_OUTPUT_FILE,
     ENRICHED_COMMITS_OUTPUT_FILE,
 )
 
@@ -27,7 +27,7 @@ def github_headers():
 def load_commits():
     commits = []
 
-    with open(COMMITS_OUTPUT_FILE, "r", encoding="utf-8") as file:
+    with open(COMMIT_OUTPUT_FILE, "r", encoding="utf-8") as file:
         for line in file:
             commits.append(json.loads(line))
 
