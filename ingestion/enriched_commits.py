@@ -7,7 +7,7 @@ import requests
 from config import (
     GITHUB_API,
     GITHUB_TOKEN,
-    COMMIT_OUTPUT_FILE,
+    COMMITS_OUTPUT_FILE,
     ENRICHED_COMMITS_OUTPUT_FILE,
 )
 
@@ -27,18 +27,30 @@ def github_headers():
 def load_commits():
     commits = []
 
-    with open(COMMIT_OUTPUT_FILE, "r", encoding="utf-8") as file:
+    with open(COMMITS_OUTPUT_FILE, "r", encoding="utf-8") as file:
         for line in file:
             commits.append(json.loads(line))
 
     return commits
 
 
+def load_existing_shas(output_path):
+    existing_shas = set()
+
+    if not output_path.exists():
+        return existing_shas
+
+    with output_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            if line.strip():
+                commit = json.loads(line)
+                existing_shas.add(commit["commit_sha"])
+
+    return existing_shas
+
+
 def get_commit_details(repo_name, commit_sha):
-    url = (
-        f"{GITHUB_API}/repos/"
-        f"{repo_name}/commits/{commit_sha}"
-    )
+    url = f"{GITHUB_API}/repos/{repo_name}/commits/{commit_sha}"
 
     response = requests.get(
         url,
@@ -65,49 +77,61 @@ def enrich_commit(commit, details):
     return enriched
 
 
-def save_enriched_commits(commits):
+def main():
     output_path = Path(ENRICHED_COMMITS_OUTPUT_FILE)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open("w", encoding="utf-8") as file:
-        for commit in commits:
-            file.write(json.dumps(commit) + "\n")
-
-
-def main():
     try:
         commits = load_commits()
 
-        enriched_commits = []
+        existing_shas = load_existing_shas(output_path)
 
-        for index, commit in enumerate(commits, start=1):
-            print(
-                f"[{index}/{len(commits)}] "
-                f"{commit['repo_name']} "
-                f"{commit['commit_sha'][:8]}"
-            )
+        print(
+            f"Already enriched: {len(existing_shas)} commits"
+        )
 
-            details = get_commit_details(
-                commit["repo_name"],
-                commit["commit_sha"],
-            )
+        remaining = [
+            commit
+            for commit in commits
+            if commit["commit_sha"] not in existing_shas
+        ]
 
-            enriched = enrich_commit(
-                commit,
-                details,
-            )
+        print(
+            f"Remaining: {len(remaining)} commits"
+        )
 
-            enriched_commits.append(enriched)
+        with output_path.open("a", encoding="utf-8") as file:
 
-        save_enriched_commits(enriched_commits)
+            for index, commit in enumerate(remaining, start=1):
+
+                print(
+                    f"[{index}/{len(remaining)}] "
+                    f"{commit['repo_name']} "
+                    f"{commit['commit_sha'][:8]}"
+                )
+
+                details = get_commit_details(
+                    commit["repo_name"],
+                    commit["commit_sha"],
+                )
+
+                enriched = enrich_commit(
+                    commit,
+                    details,
+                )
+
+                file.write(
+                    json.dumps(enriched) + "\n"
+                )
+
+                file.flush()
 
         print()
         print(
-            f"Enriched {len(enriched_commits)} commits."
+            f"Enriched {len(remaining)} new commits."
         )
         print(
-            f"Saved to: "
-            f"{ENRICHED_COMMITS_OUTPUT_FILE}"
+            f"Saved to: {ENRICHED_COMMITS_OUTPUT_FILE}"
         )
 
     except requests.HTTPError as error:
