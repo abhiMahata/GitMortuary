@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git Pattern Analysis — Pipeline & Cluster Dashboard</title>
+  <meta name="description" content="Visual exploration dashboard for GitHub commit history patterns, Hadoop MapReduce feature aggregations, and Apache Spark MLlib K-Means clustering.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <div class="header-title-group">
+        <h1 id="dashboard-main-title">Git Pattern Analysis</h1>
+        <div class="pipeline-badge">
+          <span>Pipeline Flow:</span>
+          <code>GitHub API → HDFS → MapReduce → Spark MLlib</code>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="status-pill" id="pipeline-status-pill">
+          <span class="pulse-dot"></span>
+          <span id="status-text">Pipeline Active</span>
+        </div>
+        <button id="btn-refresh" class="btn-secondary" title="Reload live data from artifacts">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          Refresh Data
+        </button>
+      </div>
+    </header>
+
+    <!-- Provenance & Synthetic Data Warning Banner -->
+    <div id="provenance-banner" class="provenance-banner" role="alert">
+      <div class="banner-icon">⚠️</div>
+      <div class="banner-content">
+        <h4>Dataset Provenance & Quality Notice</h4>
+        <p id="provenance-notice-text">
+          <strong>98.5% Synthetic Enrichment:</strong> 985 of the 1,000 sampled commit records were generated via deterministic mock mode (<code>--mock</code>) using SHA-256 hash seeds to exercise the data engineering pipeline without requiring live GitHub API quotas. Only 15 records reflect live GitHub API diff data.
+          <strong>Unsupervised Clustering Notice:</strong> Spark K-Means cluster assignments reflect geometric feature proximity across commit counts, additions, deletions, lines, files, and merge ratios. Clusters are not performance rankings or repository health scores.
+        </p>
+      </div>
+    </div>
+
+    <!-- Section A: Overview KPIs -->
+    <section class="overview-grid" id="overview-grid" aria-label="Pipeline Metrics Overview">
+      <div class="kpi-card" id="kpi-repos">
+        <div class="kpi-label">Repositories</div>
+        <div class="kpi-value" id="val-repos">--</div>
+        <div class="kpi-meta">High-star GitHub sample</div>
+      </div>
+      <div class="kpi-card" id="kpi-commits">
+        <div class="kpi-label">Commits Collected</div>
+        <div class="kpi-value" id="val-commits">--</div>
+        <div class="kpi-meta">Sampled recent history</div>
+      </div>
+      <div class="kpi-card" id="kpi-enrichment">
+        <div class="kpi-label">Enriched Commits</div>
+        <div class="kpi-value" id="val-enriched">--</div>
+        <div class="kpi-meta" id="val-enriched-sub">
+          <span class="badge-authentic">15 Real</span>
+          <span class="badge-synthetic">985 Mock</span>
+        </div>
+      </div>
+      <div class="kpi-card" id="kpi-clusters">
+        <div class="kpi-label">Clustered Repos</div>
+        <div class="kpi-value" id="val-clusters">--</div>
+        <div class="kpi-meta" id="val-clusters-sub">Across 4 K-Means clusters</div>
+      </div>
+    </section>
+
+    <!-- Section B: Cluster Exploration -->
+    <section class="dashboard-section" id="cluster-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Spark MLlib K-Means Clusters</h2>
+          <p class="section-subtitle">Unsupervised clustering on 6 normalized repository-level commit features (K=4, Seed=42)</p>
+        </div>
+      </div>
+
+      <!-- Cluster Cards -->
+      <div class="cluster-cards-grid" id="cluster-cards-container">
+        <!-- Rendered by app.js -->
+      </div>
+
+      <!-- Feature Comparison Chart -->
+      <div class="chart-container" id="cluster-chart-container">
+        <h3 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary);">
+          Cluster Feature Comparison (Average Values)
+        </h3>
+        <div id="cluster-svg-chart" style="width: 100%; min-height: 220px;">
+          <!-- SVG rendered dynamically by app.js -->
+        </div>
+        <div class="chart-legend" id="cluster-chart-legend">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Section C: Repository Profiles & Table -->
+    <section class="dashboard-section" id="repo-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Repository Feature Profiles</h2>
+          <p class="section-subtitle">Aggregated metrics from MapReduce streaming pipeline with assigned Spark MLlib clusters</p>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar" id="table-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="input-search" class="search-input" placeholder="Search by repository name or language…" autocomplete="off">
+        </div>
+        <select id="select-cluster-filter" class="filter-select" aria-label="Filter by cluster">
+          <option value="all">All Clusters</option>
+          <option value="0">Cluster 0</option>
+          <option value="1">Cluster 1</option>
+          <option value="2">Cluster 2</option>
+          <option value="3">Cluster 3</option>
+        </select>
+        <select id="select-lang-filter" class="filter-select" aria-label="Filter by programming language">
+          <option value="all">All Languages</option>
+        </select>
+        <button id="btn-reset-filters" class="btn-secondary" type="button">Reset Filters</button>
+      </div>
+
+      <!-- Table -->
+      <div class="table-responsive">
+        <table class="data-table" id="repos-table">
+          <thead>
+            <tr>
+              <th data-col="repo_name" id="th-repo-name">Repository</th>
+              <th data-col="language" id="th-language">Language</th>
+              <th data-col="stars" id="th-stars">Stars</th>
+              <th data-col="commit_count" id="th-commits">Commits</th>
+              <th data-col="distinct_authors" id="th-authors">Authors</th>
+              <th data-col="merge_ratio" id="th-merge-ratio">Merge Ratio</th>
+              <th data-col="avg_additions" id="th-avg-add">Avg Additions</th>
+              <th data-col="avg_deletions" id="th-avg-del">Avg Deletions</th>
+              <th data-col="avg_lines_changed" id="th-avg-lines">Avg Lines</th>
+              <th data-col="avg_files_changed" id="th-avg-files">Avg Files</th>
+              <th data-col="cluster" id="th-cluster">Cluster</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr>
+              <td colspan="11" class="empty-state">Loading repository data…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section D: Data Quality & Provenance Pipeline -->
+    <section class="dashboard-section" id="provenance-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Data Pipeline Provenance & Artifact Status</h2>
+          <p class="section-subtitle">Real-time status of pipeline artifacts loaded from project filesystem</p>
+        </div>
+      </div>
+      <div class="pipeline-flow-grid" id="pipeline-flow-container">
+        <!-- Rendered by app.js -->
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer">
+      <p>Git Pattern Analysis Data Engineering Pipeline &bull; Hadoop 3.2.1 &bull; Apache Spark 3.5.9 MLlib &bull; Python 3.12</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

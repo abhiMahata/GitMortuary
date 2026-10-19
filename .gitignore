@@ -1,18 +1,53 @@
-node-modules/
-dist/
-
-
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
 
+# Testing and test coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Credentials, secrets, and environment files
 .env
 .env.*
+*.pem
+*.key
 
-*.log
+# Editor and IDE metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
+# Operating System files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
 
+# Runtime, process, and temporary logs
+*.log
 *.pid
+
+# Node dependencies
+node-modules/
+node_modules/
+
+# Pipeline transient runtime outputs
+data/sample/enrichment_errors.jsonl
+
