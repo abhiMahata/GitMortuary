@@ -120,6 +120,46 @@ body {
   gap: 12px;
 }
 
+.run-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.run-selector-container:focus-within {
+  border-color: var(--accent-cyan);
+}
+
+.run-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.run-select {
+  background: transparent;
+  border: none;
+  color: var(--accent-cyan);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  max-width: 280px;
+}
+
+.run-select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
 .status-pill {
   display: flex;
   align-items: center;

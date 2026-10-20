@@ -275,7 +275,7 @@ class TestSparkKMeansClustering:
 
 class TestSparkSmallDatasetResilience:
     def test_small_dataset_with_k_equals_repos(self, spark):
-        # Exactly 2 repos with k=2
+        # Exactly 2 repos with k=2: Degenerate singleton clustering, silhouette is undefined
         data = [
             make_commit(repo_id=1, repo_name="tiny1", sha="t1", additions=10, deletions=2),
             make_commit(repo_id=2, repo_name="tiny2", sha="t2", additions=100, deletions=20),
@@ -286,7 +286,69 @@ class TestSparkSmallDatasetResilience:
         predictions, model, silhouette = run_kmeans(features_df, k=2, seed=42)
         rows = predictions.collect()
         assert len(rows) == 2
+        # Mathematically undefined: N=k results in all singleton clusters
+        assert silhouette is None
+
+    def test_valid_silhouette_range_when_n_greater_than_k(self, spark):
+        # 4 repos with k=2: Proper clustering where silhouette score is valid and in [-1, 1]
+        data = [
+            make_commit(repo_id=1, repo_name="repo1", sha="r1", additions=10, deletions=2),
+            make_commit(repo_id=2, repo_name="repo2", sha="r2", additions=12, deletions=3),
+            make_commit(repo_id=3, repo_name="repo3", sha="r3", additions=500, deletions=100),
+            make_commit(repo_id=4, repo_name="repo4", sha="r4", additions=520, deletions=110),
+        ]
+        df = spark.createDataFrame(data, schema=ENRICHED_SCHEMA)
+        features_df = aggregate_features(df)
+
+        predictions, model, silhouette = run_kmeans(features_df, k=2, seed=42)
+        assert silhouette is not None
         assert math.isfinite(silhouette)
+        assert -1.0 <= silhouette <= 1.0
+        assert silhouette > 0.8  # Well-separated clusters should yield high positive silhouette
+
+    def test_identical_feature_vectors_raises_value_error(self, spark):
+        # Repositories with identical metrics cannot form k >= 2 clusters
+        data = [
+            make_commit(repo_id=1, repo_name="r1", sha="s1", additions=10, deletions=2),
+            make_commit(repo_id=2, repo_name="r2", sha="s2", additions=10, deletions=2),
+            make_commit(repo_id=3, repo_name="r3", sha="s3", additions=10, deletions=2),
+        ]
+        df = spark.createDataFrame(data, schema=ENRICHED_SCHEMA)
+        features_df = aggregate_features(df)
+
+        with pytest.raises(ValueError, match="identical feature vectors"):
+            run_kmeans(features_df, k=2, seed=42)
+
+    def test_fewer_distinct_vectors_than_k_raises_value_error(self, spark):
+        # 3 repos, but only 2 distinct vectors, with k=3 requested
+        data = [
+            make_commit(repo_id=1, repo_name="r1", sha="s1", additions=10, deletions=2),
+            make_commit(repo_id=2, repo_name="r2", sha="s2", additions=10, deletions=2),
+            make_commit(repo_id=3, repo_name="r3", sha="s3", additions=50, deletions=10),
+        ]
+        df = spark.createDataFrame(data, schema=ENRICHED_SCHEMA)
+        features_df = aggregate_features(df)
+
+        with pytest.raises(ValueError, match="Cannot form 3 clusters: only 2 distinct feature vectors exist"):
+            run_kmeans(features_df, k=3, seed=42)
+
+    def test_kmeans_reproducibility_with_seed(self, spark):
+        # Same dataset and seed must yield identical cluster assignments
+        data = [
+            make_commit(repo_id=1, repo_name="r1", sha="s1", additions=10, deletions=2),
+            make_commit(repo_id=2, repo_name="r2", sha="s2", additions=15, deletions=3),
+            make_commit(repo_id=3, repo_name="r3", sha="s3", additions=100, deletions=20),
+            make_commit(repo_id=4, repo_name="r4", sha="s4", additions=120, deletions=25),
+        ]
+        df = spark.createDataFrame(data, schema=ENRICHED_SCHEMA)
+        features_df = aggregate_features(df)
+
+        preds1, _, _ = run_kmeans(features_df, k=2, seed=42)
+        preds2, _, _ = run_kmeans(features_df, k=2, seed=42)
+
+        c1 = [r.cluster for r in preds1.orderBy("repo_name").collect()]
+        c2 = [r.cluster for r in preds2.orderBy("repo_name").collect()]
+        assert c1 == c2
 
     def test_invalid_k_less_than_two_raises_value_error(self, spark):
         # KMeans requires at least k >= 2

@@ -15,8 +15,41 @@ set -euo pipefail
 
 NAMENODE_CONTAINER="git-commit-pattern-namenode-1"
 HDFS_BASE="/user/hadoop/git-pattern"
-HDFS_INPUT="$HDFS_BASE/enriched_commits.jsonl"
-HDFS_OUTPUT="$HDFS_BASE/repo_features"
+HDFS_INPUT=""
+HDFS_OUTPUT=""
+LOCAL_OUTPUT="data/output/repo_features_mr"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --hdfs-base)
+            HDFS_BASE="$2"
+            shift 2
+            ;;
+        --input)
+            HDFS_INPUT="$2"
+            shift 2
+            ;;
+        --output)
+            HDFS_OUTPUT="$2"
+            shift 2
+            ;;
+        --local-output)
+            LOCAL_OUTPUT="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$HDFS_INPUT" ]; then
+    HDFS_INPUT="$HDFS_BASE/enriched_commits.jsonl"
+fi
+if [ -z "$HDFS_OUTPUT" ]; then
+    HDFS_OUTPUT="$HDFS_BASE/repo_features"
+fi
+
 STREAMING_JAR="/opt/hadoop-3.2.1/share/hadoop/tools/lib/hadoop-streaming-3.2.1.jar"
 
 echo "=== Git Pattern Analysis — MapReduce ==="
@@ -61,7 +94,6 @@ docker exec "$NAMENODE_CONTAINER" hdfs dfs -ls "$HDFS_OUTPUT"
 echo ""
 
 # --- Pull results back to local ---
-LOCAL_OUTPUT="data/output/repo_features_mr"
 mkdir -p "$LOCAL_OUTPUT"
 docker exec "$NAMENODE_CONTAINER" \
     bash -c "hdfs dfs -cat $HDFS_OUTPUT/part-* > /tmp/mr_output.jsonl"
@@ -72,8 +104,9 @@ echo "  Local copy of distributed results: $LOCAL_OUTPUT/repo_features.jsonl"
 echo ""
 
 # --- Validate distributed vs local output ---
-echo "Comparing distributed MapReduce results with validated local baseline:"
-python3 -c "
+if [ "$LOCAL_OUTPUT" = "data/output/repo_features_mr" ] && [ -f "data/output/repo_features_local.jsonl" ]; then
+    echo "Comparing distributed MapReduce results with validated local baseline:"
+    python3 -c "
 import json
 
 with open('$LOCAL_OUTPUT/repo_features.jsonl') as f:
@@ -106,3 +139,12 @@ if mismatches:
 else:
     print('  [PASS] 20/20 repository feature records match bit-for-bit with local baseline!')
 "
+else
+    echo "Validating produced distributed feature records:"
+    python3 -c "
+import json
+with open('$LOCAL_OUTPUT/repo_features.jsonl') as f:
+    mr_rows = [json.loads(l) for l in f if l.strip()]
+print(f'  ✓ Successfully produced {len(mr_rows)} repository feature records.')
+"
+fi

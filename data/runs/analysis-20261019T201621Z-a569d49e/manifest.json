@@ -1,0 +1,62 @@
+{
+  "manifest_version": "1.0",
+  "analysis_id": "analysis-20261019T201621Z-a569d49e",
+  "type": "orchestrated_analysis",
+  "started_at": "2026-10-19T20:16:21.826826+00:00",
+  "completed_at": "2026-10-19T20:16:23.793632+00:00",
+  "duration_seconds": 1.97,
+  "status": "complete",
+  "repositories_requested": [
+    "octocat/Hello-World"
+  ],
+  "commit_limit": 3,
+  "stages": {
+    "ingestion": {
+      "status": "success",
+      "repositories_attempted": 1,
+      "repositories_succeeded": 1,
+      "repositories_failed": 0,
+      "runs": [
+        {
+          "repository": "octocat/Hello-World",
+          "status": "truncated",
+          "commits": 3,
+          "enriched": 3,
+          "directory": "repositories/octocat_Hello-World"
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "success",
+      "mode": "local_streaming",
+      "features_count": 1,
+      "output_file": "repo_features.jsonl"
+    },
+    "spark": {
+      "status": "skipped",
+      "k": 4,
+      "seed": 42,
+      "clusters_count": 0,
+      "silhouette": null,
+      "output_file": "repo_clusters.json",
+      "reason": "Clustering requires at least 2 repositories (found 1). Single-repository clustering is mathematically degenerate and not presented as meaningful analysis."
+    }
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 3,
+    "enriched_commits": 3,
+    "authentic_records": 3,
+    "synthetic_records": 0
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "features": "repo_features.jsonl",
+    "clusters": null,
+    "manifest": "pipeline_manifest.json"
+  },
+  "warnings": [],
+  "errors": []
+}

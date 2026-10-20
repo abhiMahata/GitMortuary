@@ -19,6 +19,12 @@
         </div>
       </div>
       <div class="header-actions">
+        <div class="run-selector-container">
+          <label for="select-active-run" class="run-label">Run:</label>
+          <select id="select-active-run" class="run-select" aria-label="Select pipeline analysis run">
+            <option value="sample">Baseline Sample (20 repos)</option>
+          </select>
+        </div>
         <div class="status-pill" id="pipeline-status-pill">
           <span class="pulse-dot"></span>
           <span id="status-text">Pipeline Active</span>

@@ -24,6 +24,7 @@ reflect real GitHub statistics.
 
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -129,9 +130,20 @@ def aggregate_features(enriched_df):
 # ---------------------------------------------------------------------------
 
 def run_kmeans(features_df, k: int, seed: int):
-    """Assemble feature vector, scale, run KMeans."""
+    """
+    Assemble feature vector, scale with StandardScaler, and run K-Means clustering.
+    Validates cluster prerequisites and computes silhouette score rigorously.
+    Returns (predictions_df, model, silhouette_score).
+    """
     if k < 2:
         raise ValueError(f"K-Means clustering requires k >= 2 (received k={k}).")
+
+    total_count = features_df.count()
+    if total_count < 2:
+        raise ValueError(f"At least 2 repositories required for K-Means clustering (found {total_count}).")
+
+    if total_count < k:
+        raise ValueError(f"Cannot form {k} clusters: only {total_count} repositories available.")
 
     assembler = VectorAssembler(
         inputCols=FEATURE_COLS,
@@ -139,6 +151,17 @@ def run_kmeans(features_df, k: int, seed: int):
         handleInvalid="skip",
     )
     assembled = assembler.transform(features_df)
+
+    distinct_feature_vectors = assembled.select("raw_features").distinct().count()
+    if distinct_feature_vectors < 2:
+        raise ValueError(
+            "Cannot cluster repositories: all repositories have identical feature vectors (zero variance across all metrics). "
+            "At least 2 distinct feature vectors are required."
+        )
+    if distinct_feature_vectors < k:
+        raise ValueError(
+            f"Cannot form {k} clusters: only {distinct_feature_vectors} distinct feature vectors exist."
+        )
 
     scaler = StandardScaler(
         inputCol="raw_features",
@@ -153,13 +176,31 @@ def run_kmeans(features_df, k: int, seed: int):
     model = kmeans.fit(scaled)
     predictions = model.transform(scaled)
 
-    evaluator = ClusteringEvaluator(
-        featuresCol="features", predictionCol="cluster", metricName="silhouette"
-    )
-    if k > 1 and predictions.select("cluster").distinct().count() > 1:
-        silhouette = float(evaluator.evaluate(predictions))
+    # Evaluate silhouette score with mathematical rigor
+    distinct_clusters = predictions.select("cluster").distinct().count()
+    cluster_counts = [r["count"] for r in predictions.groupBy("cluster").count().collect()]
+
+    # Degenerate configurations:
+    # 1. Fewer than 2 clusters formed
+    # 2. Number of observations <= number of clusters (all singleton clusters)
+    # 3. All clusters are singletons (intra-cluster cohesion undefined)
+    if distinct_clusters < 2 or total_count <= distinct_clusters or all(c <= 1 for c in cluster_counts):
+        silhouette = None
     else:
-        silhouette = 0.0
+        evaluator = ClusteringEvaluator(
+            featuresCol="features",
+            predictionCol="cluster",
+            metricName="silhouette",
+            distanceMeasure="squaredEuclidean",
+        )
+        try:
+            val = float(evaluator.evaluate(predictions))
+            if math.isfinite(val) and -1.0 <= val <= 1.0:
+                silhouette = round(val, 4)
+            else:
+                silhouette = None
+        except Exception:
+            silhouette = None
 
     return predictions, model, silhouette
 
@@ -168,13 +209,18 @@ def run_kmeans(features_df, k: int, seed: int):
 # Output helpers
 # ---------------------------------------------------------------------------
 
-def print_results(results_df, silhouette: float) -> None:
+def print_results(results_df, silhouette: float | None) -> None:
     print("\n" + "=" * 72)
     print("Git Pattern Analysis — K-Means Clustering Results")
     print("=" * 72)
+    k_clusters = results_df.select("cluster").distinct().count()
+    if silhouette is not None:
+        sil_str = f"{silhouette:.4f}"
+    else:
+        sil_str = "N/A (undefined for degenerate/singleton configuration where N <= K)"
+
     print(
-        f"  K = {results_df.select('cluster').distinct().count()} clusters | "
-        f"Silhouette score = {silhouette:.4f}"
+        f"  K = {k_clusters} clusters | Silhouette score = {sil_str}"
     )
     print()
 
@@ -243,6 +289,12 @@ def main() -> None:
             "If omitted, reads local JSONL files."
         ),
     )
+    parser.add_argument(
+        "--input",
+        default=None,
+        metavar="INPUT_PATH",
+        help="Path to enriched commits JSONL file (default: data/sample/enriched_commits.jsonl)",
+    )
     parser.add_argument("--k", type=int, default=DEFAULT_K,
                         help=f"Number of clusters (default: {DEFAULT_K})")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED,
@@ -265,6 +317,12 @@ def main() -> None:
     if args.hdfs:
         enriched_path = f"{args.hdfs.rstrip('/')}/enriched_commits.jsonl"
         print(f"Loading from HDFS: {enriched_path}")
+    elif args.input:
+        enriched_path = args.input
+        if not Path(enriched_path).exists():
+            print(f"[ERROR] Input file does not exist: {enriched_path}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Loading custom input file: {enriched_path}")
     else:
         enriched_path = "data/sample/enriched_commits.jsonl"
         print(f"Loading local file: {enriched_path}")

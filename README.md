@@ -168,6 +168,47 @@ Once running, navigate in any modern browser to:
 python3 -m pytest tests/ -v
 ```
 
+### 10. Dynamic Repository Ingestion (Authentic Data)
+
+To ingest and analyze any public GitHub repository with 100% authentic data (saving to an isolated run directory without touching sample data):
+
+```bash
+# Analyze a repository using owner/name slug:
+python3 -m ingestion.analyze_repository psf/requests
+
+# Or provide a full GitHub URL:
+python3 -m ingestion.analyze_repository https://github.com/psf/requests
+
+# Custom commit limit and isolated output directory:
+python3 -m ingestion.analyze_repository --max-commits 25 --output-dir data/runs/requests_run psf/requests
+```
+
+**Environment & Rate-Limit Configuration:**
+- **Unauthenticated mode:** Operates without credentials for public repositories (GitHub rate limit: 60 requests/hour).
+- **Authenticated mode:** Set `GITHUB_TOKEN` to increase your rate limit to 5,000 requests/hour:
+  ```bash
+  export GITHUB_TOKEN=ghp_your_token_here
+  python3 -m ingestion.analyze_repository psf/requests
+  ```
+  *(Tokens are read securely from the environment and are never printed, logged, or stored in artifacts.)*
+
+**Run Directory Structure:**
+Each run outputs to an isolated directory (e.g. `data/runs/<repo>-<timestamp>-<run-id>/`):
+- `repositories.jsonl`: Repository metadata matching `REPO_REQUIRED` schema.
+- `commits.jsonl`: Basic commit list matching `COMMIT_REQUIRED` schema.
+- `enriched_commits.jsonl`: Authentic line additions, deletions, and file counts (`synthetic: false`).
+- `manifest.json`: Run manifest recording commit limits, record counts, completeness status, and rate-limit headroom.
+
+**Completeness Semantics:**
+- `--max-commits` / `-n`: Sets the maximum commit fetch threshold.
+- `status: "complete"` / `is_complete: true`: Entire repository history was retrieved.
+- `status: "truncated"` / `is_complete: false`: Ingestion stopped at the configured commit limit.
+- `status: "empty"`: Repository contains 0 commits.
+
+**Provenance Distinction:**
+- `data/sample/`: Baseline 20-repo demonstration dataset (985 synthetic, 15 authentic). Strictly protected from overwrite.
+- `data/runs/`: Isolated dynamic runs containing 100% authentic, verified GitHub API data.
+
 ---
 
 ## Running Commands (HDFS cluster)
@@ -258,7 +299,7 @@ All repo_features fields plus:
 | `enriched_commits.jsonl` (mock) | ✅ 1000/1000 records (100%), marked `synthetic=True` |
 | `enriched_commits.jsonl` (live 15) | ✅ 15 real GitHub records preserved |
 | Dataset validation script | ✅ All core checks pass (PASS WITH WARNINGS: mock data noted) |
-| Automated Tests (112 tests) | ✅ 112 passed, 0 failures (Ingestion: 69, MapReduce: 23, Spark: 7, Dashboard: 13) |
+| Automated Tests (145 tests) | ✅ 145 passed, 0 failures (Ingestion: 69, MapReduce: 23, Spark: 7, Dashboard: 13, Dynamic Ingestion: 33) |
 | MapReduce local simulation | ✅ 20 repos aggregated correctly into `repo_features_local.jsonl` |
 | MapReduce distributed (YARN/HDFS) | ✅ Hadoop Streaming job verified in Docker cluster (`repo_features_mr/`) |
 | Spark MLlib clustering | ✅ 20 repos clustered (k=4, silhouette score ~0.404) |
@@ -311,7 +352,8 @@ git-commit-pattern/
 │   ├── config.py
 │   ├── discover_repos.py
 │   ├── collect_commits.py
-│   └── enriched_commits.py
+│   ├── enriched_commits.py
+│   └── analyze_repository.py     # Dynamic repository ingestion CLI
 ├── mapreduce/
 │   ├── mapper.py
 │   └── reducer.py
@@ -328,7 +370,8 @@ git-commit-pattern/
 │   ├── test_ingestion.py         # 69 tests
 │   ├── test_mapreduce.py         # 23 tests
 │   ├── test_spark.py             # 7 tests
-│   └── test_dashboard.py         # 13 tests
+│   ├── test_dashboard.py         # 13 tests
+│   └── test_analyze_repository.py # 33 tests
 ├── docker-compose.yml
 └── requirements.txt
 ```

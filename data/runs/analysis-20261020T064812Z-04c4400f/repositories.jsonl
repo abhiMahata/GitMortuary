@@ -1,0 +1,4 @@
+{"repo_id": 1362490, "repo_name": "psf/requests", "language": "Python", "stars": 54521, "forks": 13232, "created_at": "2011-02-13T18:38:17Z", "updated_at": "2026-10-20T03:14:52Z", "archived": false, "default_branch": "main"}
+{"repo_id": 596892, "repo_name": "pallets/flask", "language": "Python", "stars": 74966, "forks": 17109, "created_at": "2010-04-06T11:11:59Z", "updated_at": "2026-10-19T21:03:49Z", "archived": false, "default_branch": "main"}
+{"repo_id": 19103692, "repo_name": "pallets/click", "language": "Python", "stars": 17794, "forks": 5110, "created_at": "2014-04-24T09:52:19Z", "updated_at": "2026-10-20T02:37:13Z", "archived": false, "default_branch": "main"}
+{"repo_id": 179492861, "repo_name": "encode/httpx", "language": "Python", "stars": 15643, "forks": 4401, "created_at": "2019-04-04T12:27:00Z", "updated_at": "2026-10-20T00:50:56Z", "archived": false, "default_branch": "master"}

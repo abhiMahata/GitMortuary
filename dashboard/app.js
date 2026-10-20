@@ -18,7 +18,10 @@ document.addEventListener("DOMContentLoaded", () => {
     3: "#8b5cf6", // Violet
   };
 
+  let activeRunId = "sample";
+
   // DOM Elements
+  const elSelectActiveRun = document.getElementById("select-active-run");
   const elValRepos = document.getElementById("val-repos");
   const elValCommits = document.getElementById("val-commits");
   const elValEnriched = document.getElementById("val-enriched");
@@ -34,11 +37,36 @@ document.addEventListener("DOMContentLoaded", () => {
   const elBtnRefresh = document.getElementById("btn-refresh");
   const elFlowContainer = document.getElementById("pipeline-flow-container");
 
+  // Load available runs from API
+  async function loadRuns() {
+    try {
+      const response = await fetch("/api/runs");
+      if (!response.ok) return;
+      const json = await response.json();
+      const runs = json.runs || [];
+      if (!elSelectActiveRun) return;
+
+      elSelectActiveRun.innerHTML = runs.map(r => {
+        return `<option value="${escapeHtml(r.run_id)}">${escapeHtml(r.label)}</option>`;
+      }).join("");
+
+      elSelectActiveRun.value = activeRunId || "sample";
+    } catch (err) {
+      console.warn("Could not load runs list:", err);
+    }
+  }
+
   // Fetch live dashboard data from local API
-  async function loadData() {
+  async function loadData(runId = null) {
+    if (runId !== null) {
+      activeRunId = runId;
+    }
+    const currentRun = activeRunId || "sample";
+
     try {
       elTableBody.innerHTML = `<tr><td colspan="11" class="empty-state">Loading data from pipeline artifacts…</td></tr>`;
-      const response = await fetch("/api/data");
+      const url = currentRun === "sample" ? "/api/data" : `/api/data?run=${encodeURIComponent(currentRun)}`;
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
       }
@@ -52,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="empty-state-icon">⚠️</div>
             <strong>Failed to load pipeline data:</strong> ${escapeHtml(err.message)}<br>
             <small style="color: var(--text-muted); margin-top: 6px; display: inline-block;">
-              Ensure <code>dashboard/server.py</code> is running and artifact files exist in <code>data/</code>.
+              Ensure <code>dashboard/server.py</code> is running and artifacts exist for run <code>${escapeHtml(currentRun)}</code>.
             </small>
           </td>
         </tr>`;
@@ -75,14 +103,65 @@ document.addEventListener("DOMContentLoaded", () => {
     elValRepos.textContent = ov.total_repositories != null ? ov.total_repositories : "--";
     elValCommits.textContent = ov.total_commits != null ? Number(ov.total_commits).toLocaleString() : "--";
     elValEnriched.textContent = ov.total_enriched != null ? Number(ov.total_enriched).toLocaleString() : "--";
-    elValClusters.textContent = ov.repositories_clustered != null ? ov.repositories_clustered : "--";
+
+    const summary = dashboardData.cluster_summary || {};
+    const subClusters = document.getElementById("val-clusters-sub");
+    if (summary.stage_status === "skipped" || summary.skipped) {
+      elValClusters.textContent = "Skipped";
+      if (subClusters) subClusters.textContent = "Requires ≥ 2 repositories";
+    } else {
+      elValClusters.textContent = ov.repositories_clustered != null ? ov.repositories_clustered : "--";
+      if (subClusters) subClusters.textContent = `Across ${ov.cluster_count || 0} K-Means clusters`;
+    }
 
     const subEnriched = document.getElementById("val-enriched-sub");
     if (subEnriched && ov.total_enriched) {
-      subEnriched.innerHTML = `
-        <span class="badge-authentic" title="Authentic GitHub API records">${ov.authentic_enriched} Real (${(ov.authentic_enriched / ov.total_enriched * 100).toFixed(1)}%)</span>
-        <span class="badge-synthetic" title="Deterministic mock-enriched records">${ov.synthetic_enriched} Mock (${ov.synthetic_percentage}%)</span>
-      `;
+      if (ov.synthetic_enriched === 0) {
+        subEnriched.innerHTML = `
+          <span class="badge-authentic" title="Authentic GitHub API records">100% Real Live Data (${ov.authentic_enriched})</span>
+        `;
+      } else {
+        subEnriched.innerHTML = `
+          <span class="badge-authentic" title="Authentic GitHub API records">${ov.authentic_enriched} Real (${(ov.authentic_enriched / ov.total_enriched * 100).toFixed(1)}%)</span>
+          <span class="badge-synthetic" title="Deterministic mock-enriched records">${ov.synthetic_enriched} Mock (${ov.synthetic_percentage}%)</span>
+        `;
+      }
+    }
+
+    // Provenance Banner
+    const prov = dashboardData.provenance_notice || {};
+    const elBanner = document.getElementById("provenance-banner");
+    const elBannerText = document.getElementById("provenance-notice-text");
+    if (elBanner && elBannerText) {
+      if (prov.is_authentic_live) {
+        elBanner.style.background = "linear-gradient(90deg, rgba(16, 185, 129, 0.14) 0%, rgba(17, 24, 39, 0.75) 100%)";
+        elBanner.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        const icon = elBanner.querySelector(".banner-icon");
+        if (icon) icon.textContent = "🛡️";
+        const h4 = elBanner.querySelector("h4");
+        if (h4) {
+          h4.textContent = `Authentic Live GitHub Run: ${dashboardData.run_info?.run_id || ""}`;
+          h4.style.color = "#34d399";
+        }
+        elBannerText.innerHTML = `
+          <strong>100% Authentic Live Data:</strong> All commit statistics and diff metrics were retrieved directly from the live GitHub REST API.
+          <strong>Unsupervised Clustering Notice:</strong> ${escapeHtml(prov.unsupervised_notice || "")}
+        `;
+      } else {
+        elBanner.style.background = "linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(17, 24, 39, 0.7) 100%)";
+        elBanner.style.borderColor = "rgba(245, 158, 11, 0.35)";
+        const icon = elBanner.querySelector(".banner-icon");
+        if (icon) icon.textContent = "⚠️";
+        const h4 = elBanner.querySelector("h4");
+        if (h4) {
+          h4.textContent = "Dataset Provenance & Quality Notice";
+          h4.style.color = "#fbbf24";
+        }
+        elBannerText.innerHTML = `
+          <strong>98.5% Synthetic Enrichment:</strong> 985 of the 1,000 sampled commit records were generated via deterministic mock mode (<code>--mock</code>) using SHA-256 hash seeds to exercise the data engineering pipeline without requiring live GitHub API quotas. Only 15 records reflect live GitHub API diff data.
+          <strong>Unsupervised Clustering Notice:</strong> Spark K-Means cluster assignments reflect geometric feature proximity across commit counts, additions, deletions, lines, files, and merge ratios. Clusters are not performance rankings or repository health scores.
+        `;
+      }
     }
   }
 
@@ -92,8 +171,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const profiles = summary.profiles || {};
     const clusterIds = summary.cluster_ids || [];
 
+    if (summary.stage_status === "skipped" || summary.skipped) {
+      elClusterCards.innerHTML = `
+        <div class="empty-state" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-glass); padding: 22px; border-radius: var(--radius-md); text-align: left; width: 100%;">
+          <div style="font-size: 0.9375rem; font-weight: 600; color: #38bdf8; margin-bottom: 6px;">ℹ Spark MLlib Clustering Skipped</div>
+          <div style="color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.5;">${escapeHtml(summary.stage_reason || "Clustering requires at least 2 repositories.")}</div>
+          <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 8px;">Single-repository clustering is mathematically degenerate and not presented as meaningful analysis. Feature aggregation from Hadoop MapReduce is preserved in the table below.</div>
+        </div>
+      `;
+      return;
+    }
+
     if (!clusterIds.length) {
-      elClusterCards.innerHTML = `<div class="empty-state">No cluster assignments available. Run <code>python3 spark/cluster_repos.py</code>.</div>`;
+      elClusterCards.innerHTML = `<div class="empty-state">No cluster assignments available for this run.</div>`;
       return;
     }
 
@@ -153,8 +243,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const profiles = summary.profiles || {};
     const clusterIds = summary.cluster_ids || [];
 
-    if (!clusterIds.length) {
-      elSvgChart.innerHTML = "";
+    if (!clusterIds.length || summary.stage_status === "skipped" || summary.skipped) {
+      elSvgChart.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 48px 0; font-size: 0.8125rem;">Feature comparison chart unavailable (clustering skipped or no clusters assigned).</div>';
+      elChartLegend.innerHTML = "";
       return;
     }
 
@@ -308,9 +399,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     elTableBody.innerHTML = list.map(r => {
+      const isSkipped = dashboardData.cluster_summary && (dashboardData.cluster_summary.skipped || dashboardData.cluster_summary.stage_status === "skipped");
       const clusterBadge = r.cluster != null
         ? `<span class="badge-cluster badge-cluster-${r.cluster}">Cluster ${r.cluster}</span>`
-        : `<span class="stat-label">Unassigned</span>`;
+        : `<span class="stat-label" style="opacity: 0.7;">${isSkipped ? 'N/A (Skipped)' : 'Unassigned'}</span>`;
 
       const langBadge = r.language
         ? `<span class="badge-lang">${escapeHtml(r.language)}</span>`
@@ -353,43 +445,85 @@ document.addEventListener("DOMContentLoaded", () => {
   // Section D: Pipeline Provenance Flow Diagram
   function renderPipelineFlow() {
     const status = dashboardData.artifacts_status || {};
-    const stages = [
-      {
-        num: "Stage 1",
-        title: "Repository Discovery",
-        artifact: "data/sample/repositories.jsonl",
-        ready: status.repositories_found,
-        meta: "20 repos with stars > 1,000",
-      },
-      {
-        num: "Stage 2",
-        title: "Commit Collection",
-        artifact: "data/sample/commits.jsonl",
-        ready: status.commits_found,
-        meta: "1,000 recent commit records",
-      },
-      {
-        num: "Stage 3",
-        title: "Commit Enrichment",
-        artifact: "data/sample/enriched_commits.jsonl",
-        ready: status.enriched_found,
-        meta: "15 Real / 985 Mock (synthetic=True)",
-      },
-      {
-        num: "Stage 4",
-        title: "MapReduce Features",
-        artifact: status.features_source === "distributed_mr" ? "repo_features (HDFS YARN)" : "data/output/repo_features_local.jsonl",
-        ready: status.features_found,
-        meta: "20 repo feature vectors",
-      },
-      {
-        num: "Stage 5",
-        title: "Spark MLlib Clustering",
-        artifact: "data/output/repo_clusters.json",
-        ready: status.clusters_found,
-        meta: "K=4 clusters, seed=42",
-      },
-    ];
+    const isSample = !dashboardData.run_info || dashboardData.run_info.is_sample;
+    const runInfo = dashboardData.run_info || {};
+
+    let stages;
+    if (isSample) {
+      stages = [
+        {
+          num: "Stage 1",
+          title: "Repository Discovery",
+          artifact: "data/sample/repositories.jsonl",
+          ready: status.repositories_found,
+          meta: "20 repos with stars > 1,000",
+        },
+        {
+          num: "Stage 2",
+          title: "Commit Collection",
+          artifact: "data/sample/commits.jsonl",
+          ready: status.commits_found,
+          meta: "1,000 recent commit records",
+        },
+        {
+          num: "Stage 3",
+          title: "Commit Enrichment",
+          artifact: "data/sample/enriched_commits.jsonl",
+          ready: status.enriched_found,
+          meta: "15 Real / 985 Mock (synthetic=True)",
+        },
+        {
+          num: "Stage 4",
+          title: "MapReduce Features",
+          artifact: status.features_source === "distributed_mr" ? "repo_features (HDFS YARN)" : "data/output/repo_features_local.jsonl",
+          ready: status.features_found,
+          meta: "20 repo feature vectors",
+        },
+        {
+          num: "Stage 5",
+          title: "Spark MLlib Clustering",
+          artifact: "data/output/repo_clusters.json",
+          ready: status.clusters_found,
+          meta: "K=4 clusters, seed=42",
+        },
+      ];
+    } else {
+      const runStages = runInfo.stages || {};
+      const mrMode = runStages.mapreduce?.mode === "hadoop_streaming" ? "Hadoop Streaming" : "Local Streaming";
+      const sparkSkipped = runStages.spark?.status === "skipped" || (dashboardData.cluster_summary && dashboardData.cluster_summary.skipped);
+      const sparkReady = status.clusters_found && !sparkSkipped;
+
+      stages = [
+        {
+          num: "Stage 1",
+          title: "Dynamic Ingestion",
+          artifact: `data/runs/${runInfo.run_id}/`,
+          ready: status.repositories_found && status.commits_found,
+          meta: `${dashboardData.overview.total_repositories || 1} repo(s), ${dashboardData.overview.total_commits || 0} commits`,
+        },
+        {
+          num: "Stage 2",
+          title: "Enriched Commits",
+          artifact: "enriched_commits.jsonl",
+          ready: status.enriched_found,
+          meta: `${dashboardData.overview.total_enriched || 0} authentic diff records (100% real)`,
+        },
+        {
+          num: "Stage 3",
+          title: "MapReduce Features",
+          artifact: "repo_features.jsonl",
+          ready: status.features_found,
+          meta: `${mrMode} (${dashboardData.overview.total_repositories || 1} vectors)`,
+        },
+        {
+          num: "Stage 4",
+          title: "Spark MLlib Clustering",
+          artifact: "repo_clusters.json",
+          ready: sparkReady,
+          meta: sparkSkipped ? "Skipped (<2 repos)" : `${dashboardData.overview.cluster_count || 0} clusters`,
+        },
+      ];
+    }
 
     elFlowContainer.innerHTML = stages.map(s => `
       <div class="stage-card">
@@ -397,8 +531,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="stage-title">${s.title}</div>
         <div class="stage-artifact">${s.artifact}</div>
         <div class="stage-status" style="color: ${s.ready ? '#34d399' : '#f87171'};">
-          <span>${s.ready ? '✓' : '✗'}</span>
-          <span>${s.ready ? 'Verified & Loaded' : 'Missing'}</span>
+          <span>${s.ready ? '✓' : (s.meta.includes('Skipped') ? 'ℹ' : '✗')}</span>
+          <span>${s.ready ? 'Verified & Loaded' : (s.meta.includes('Skipped') ? 'Skipped Safeguard' : 'Missing')}</span>
         </div>
         <div style="font-size: 0.6875rem; color: var(--text-muted); margin-top: 4px;">${s.meta}</div>
       </div>
@@ -406,6 +540,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Event Listeners
+  if (elSelectActiveRun) {
+    elSelectActiveRun.addEventListener("change", (e) => {
+      loadData(e.target.value);
+    });
+  }
+
   elInputSearch.addEventListener("input", (e) => {
     activeSearchQuery = e.target.value.trim();
     renderTable();
@@ -434,6 +574,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   elBtnRefresh.addEventListener("click", () => {
+    loadRuns();
     loadData();
   });
 
@@ -464,5 +605,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Initial fetch
+  loadRuns();
   loadData();
 });

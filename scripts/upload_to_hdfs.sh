@@ -12,14 +12,28 @@
 set -euo pipefail
 
 HDFS_BASE="/user/hadoop/git-pattern"
-if [ "${1:-}" = "--hdfs-base" ] && [ -n "${2:-}" ]; then
-    HDFS_BASE="$2"
-elif [ -n "${1:-}" ] && [[ "${1:-}" != --* ]]; then
-    HDFS_BASE="$1"
-fi
-
-NAMENODE_CONTAINER="git-commit-pattern-namenode-1"
 LOCAL_DATA="data/sample"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --hdfs-base)
+            HDFS_BASE="$2"
+            shift 2
+            ;;
+        --local-data|--local-dir)
+            LOCAL_DATA="$2"
+            shift 2
+            ;;
+        *)
+            if [[ "$1" != --* ]]; then
+                HDFS_BASE="$1"
+                shift
+            else
+                shift
+            fi
+            ;;
+    esac
+done
 FILES=(
     "repositories.jsonl"
     "commits.jsonl"
