@@ -349,6 +349,89 @@ class TestDashboardRunIntegration:
         with pytest.raises(ValueError, match="Invalid run_id format"):
             get_dashboard_data(run_id="foo/bar")
 
+        with pytest.raises(ValueError, match="Invalid run_id format"):
+            get_dashboard_data(run_id="..")
+
     def test_get_dashboard_data_nonexistent_run_raises_404(self):
         with pytest.raises(FileNotFoundError, match="not found under data/runs"):
             get_dashboard_data(run_id="nonexistent-run-12345678")
+
+    def test_get_dashboard_data_live_run_agrees_with_artifacts(self):
+        """Verify that selecting live run loads actual artifacts matching manifest and outputs."""
+        live_run_id = "analysis-20261020T064812Z-04c4400f"
+        data = get_dashboard_data(run_id=live_run_id)
+
+        assert data["run_info"]["run_id"] == live_run_id
+        assert data["run_info"]["is_sample"] is False
+        assert data["run_info"]["status"] == "complete"
+
+        # Overview counts
+        assert data["overview"]["total_repositories"] == 4
+        assert data["overview"]["total_commits"] == 40
+        assert data["overview"]["total_enriched"] == 40
+        assert data["overview"]["authentic_enriched"] == 40
+        assert data["overview"]["synthetic_enriched"] == 0
+        assert data["overview"]["has_truncated_history"] is True
+
+        # Provenance notice
+        assert data["provenance_notice"]["is_authentic_live"] is True
+        assert "100% Authentic" in data["provenance_notice"]["authentic_badge"]
+        assert data["provenance_notice"]["has_truncated_history"] is True
+
+        # Cluster and silhouette agreement
+        assert data["cluster_summary"]["k"] == 2
+        assert data["cluster_summary"]["distance_measure"] == "squaredEuclidean"
+        assert data["cluster_summary"]["silhouette"] == 0.569
+        assert data["cluster_summary"]["silhouette_status"] == "valid"
+
+        # Specific cluster assignments
+        repo_clusters = {r["repo_name"]: r["cluster"] for r in data["repositories"]}
+        assert repo_clusters["pallets/click"] == 0
+        assert repo_clusters["encode/httpx"] == 1
+        assert repo_clusters["pallets/flask"] == 1
+        assert repo_clusters["psf/requests"] == 1
+
+        # Truncation flags per repo
+        for r in data["repositories"]:
+            assert r["is_truncated"] is True
+
+    def test_get_dashboard_data_empty_run_produces_clear_status(self):
+        """An empty run directory must produce an explicit empty status and warning message."""
+        from dashboard.server import PROJECT_ROOT
+        actual_runs = PROJECT_ROOT / "data" / "runs"
+        test_empty_dir = actual_runs / "test-empty-run-tmp"
+        try:
+            test_empty_dir.mkdir(parents=True, exist_ok=True)
+            data = get_dashboard_data(run_id="test-empty-run-tmp")
+            assert data["run_info"]["status"] == "empty"
+            assert any("contains no repository" in w for w in data["run_info"]["warnings"])
+            assert data["overview"]["total_repositories"] == 0
+        finally:
+            if test_empty_dir.exists():
+                test_empty_dir.rmdir()
+
+    def test_get_dashboard_data_malformed_manifest_handled_gracefully(self):
+        """Malformed JSON manifest must result in status='malformed' rather than crashing."""
+        from dashboard.server import PROJECT_ROOT
+        actual_runs = PROJECT_ROOT / "data" / "runs"
+        test_malformed_dir = actual_runs / "test-malformed-run-tmp"
+        try:
+            test_malformed_dir.mkdir(parents=True, exist_ok=True)
+            (test_malformed_dir / "pipeline_manifest.json").write_text("{ corrupt json: [")
+            data = get_dashboard_data(run_id="test-malformed-run-tmp")
+            assert data["run_info"]["status"] == "malformed"
+            assert any("malformed JSON" in w for w in data["run_info"]["warnings"])
+        finally:
+            if (test_malformed_dir / "pipeline_manifest.json").exists():
+                (test_malformed_dir / "pipeline_manifest.json").unlink()
+            if test_malformed_dir.exists():
+                test_malformed_dir.rmdir()
+
+    def test_unavailable_silhouette_score_not_returned_as_number(self):
+        """Single-repository run with skipped clustering must report silhouette as None, not 0.0 or a number."""
+        single_repo_run = "analysis-20261019T201621Z-a569d49e"
+        data = get_dashboard_data(run_id=single_repo_run)
+        assert data["cluster_summary"]["silhouette"] is None
+        assert data["cluster_summary"]["silhouette_status"] == "unavailable"
+        assert not isinstance(data["cluster_summary"]["silhouette"], (int, float))
+

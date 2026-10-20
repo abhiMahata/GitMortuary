@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Git Pattern Analysis — Pipeline & Cluster Dashboard</title>
-  <meta name="description" content="Visual exploration dashboard for GitHub commit history patterns, Hadoop MapReduce feature aggregations, and Apache Spark MLlib K-Means clustering.">
+  <title>Git Pattern Analysis — Repository Intelligence & Clustering Dashboard</title>
+  <meta name="description" content="General-purpose GitHub repository commit history analysis, temporal trends, author contributions, MapReduce feature aggregations, and Spark K-Means clustering.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,20 +14,20 @@
       <div class="header-title-group">
         <h1 id="dashboard-main-title">Git Pattern Analysis</h1>
         <div class="pipeline-badge">
-          <span>Pipeline Flow:</span>
+          <span>Engine:</span>
           <code>GitHub API → HDFS → MapReduce → Spark MLlib</code>
         </div>
       </div>
       <div class="header-actions">
         <div class="run-selector-container">
-          <label for="select-active-run" class="run-label">Run:</label>
+          <label for="select-active-run" class="run-label">Run History:</label>
           <select id="select-active-run" class="run-select" aria-label="Select pipeline analysis run">
             <option value="sample">Baseline Sample (20 repos)</option>
           </select>
         </div>
         <div class="status-pill" id="pipeline-status-pill">
           <span class="pulse-dot"></span>
-          <span id="status-text">Pipeline Active</span>
+          <span id="status-text">Ready</span>
         </div>
         <button id="btn-refresh" class="btn-secondary" title="Reload live data from artifacts">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,140 +40,479 @@
       </div>
     </header>
 
+    <!-- SECTION 1: REPOSITORY URL INPUT & LIVE INGESTION PANEL -->
+    <section class="analyze-repo-card" id="analyze-repo-card" aria-label="Repository Analyzer Input">
+      <div class="analyze-card-header">
+        <div class="analyze-card-title">
+          <span class="analyze-icon">⚡</span>
+          <h2>Analyze Any GitHub Repository</h2>
+        </div>
+        <span class="analyze-tag">Authentic GitHub Analysis</span>
+      </div>
+      <form id="form-analyze-repo" class="analyze-form" onsubmit="return false;">
+        <div class="form-grid">
+          <div class="form-group flex-grow">
+            <label for="input-repo-url">GitHub Repository URL or Identifier:</label>
+            <input type="text" id="input-repo-url" class="text-input" placeholder="e.g. https://github.com/psf/requests or psf/requests" autocomplete="off" required>
+          </div>
+          <div class="form-group">
+            <label>History Coverage Mode:</label>
+            <div class="radio-toggle-group">
+              <label class="radio-label">
+                <input type="radio" name="history-mode" value="recent_limit" id="radio-mode-limit" checked>
+                <span>Recent Commits</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="history-mode" value="full_history" id="radio-mode-full">
+                <span>All Available History</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group" id="limit-input-container">
+            <label for="input-commit-limit">Commit Limit:</label>
+            <input type="number" id="input-commit-limit" class="number-input" value="10" min="1" max="1000">
+          </div>
+          <div class="form-group btn-group">
+            <button type="submit" id="btn-start-analysis" class="btn-primary">
+              <span id="btn-analyze-text">Analyze Repository</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-footer-hints">
+          <span class="hint-text">Supported: <code>https://github.com/owner/repo</code>, <code>owner/repo</code>, or <code>git@github.com:owner/repo.git</code></span>
+          <span class="hint-badge" id="hint-api-quota">Rate Limit Protected &bull; Exponential Backoff</span>
+        </div>
+      </form>
+
+      <!-- Live Analysis Progress Box -->
+      <div id="analysis-progress-box" class="analysis-progress-box" style="display: none;">
+        <div class="progress-status-row">
+          <div class="progress-stage-info">
+            <span class="progress-spinner"></span>
+            <strong id="progress-stage-title">Ingesting Commits…</strong>
+            <span id="progress-stage-msg">Connecting to GitHub API…</span>
+          </div>
+          <span class="progress-percent-text" id="progress-percent-val">10%</span>
+        </div>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progress-bar-fill" style="width: 10%;"></div>
+        </div>
+      </div>
+
+      <!-- Analysis Error Box -->
+      <div id="analysis-error-box" class="analysis-error-box" style="display: none;" role="alert">
+        <span class="error-icon">❌</span>
+        <div id="analysis-error-msg">Error details</div>
+      </div>
+    </section>
+
+    <!-- Run Status Alert (Displayed when run is failed, incomplete, or empty) -->
+    <div id="run-status-alert" class="run-status-alert" style="display: none;" role="alert">
+      <!-- Populated by app.js -->
+    </div>
+
     <!-- Provenance & Synthetic Data Warning Banner -->
     <div id="provenance-banner" class="provenance-banner" role="alert">
       <div class="banner-icon">⚠️</div>
       <div class="banner-content">
         <h4>Dataset Provenance & Quality Notice</h4>
-        <p id="provenance-notice-text">
-          <strong>98.5% Synthetic Enrichment:</strong> 985 of the 1,000 sampled commit records were generated via deterministic mock mode (<code>--mock</code>) using SHA-256 hash seeds to exercise the data engineering pipeline without requiring live GitHub API quotas. Only 15 records reflect live GitHub API diff data.
-          <strong>Unsupervised Clustering Notice:</strong> Spark K-Means cluster assignments reflect geometric feature proximity across commit counts, additions, deletions, lines, files, and merge ratios. Clusters are not performance rankings or repository health scores.
-        </p>
+        <p id="provenance-notice-text">Loading provenance details…</p>
       </div>
     </div>
 
-    <!-- Section A: Overview KPIs -->
-    <section class="overview-grid" id="overview-grid" aria-label="Pipeline Metrics Overview">
-      <div class="kpi-card" id="kpi-repos">
-        <div class="kpi-label">Repositories</div>
-        <div class="kpi-value" id="val-repos">--</div>
-        <div class="kpi-meta">High-star GitHub sample</div>
-      </div>
-      <div class="kpi-card" id="kpi-commits">
-        <div class="kpi-label">Commits Collected</div>
-        <div class="kpi-value" id="val-commits">--</div>
-        <div class="kpi-meta">Sampled recent history</div>
-      </div>
-      <div class="kpi-card" id="kpi-enrichment">
-        <div class="kpi-label">Enriched Commits</div>
-        <div class="kpi-value" id="val-enriched">--</div>
-        <div class="kpi-meta" id="val-enriched-sub">
-          <span class="badge-authentic">15 Real</span>
-          <span class="badge-synthetic">985 Mock</span>
+    <!-- ==================================================================== -->
+    <!-- VIEW CONTAINER A: SINGLE REPOSITORY ANALYSIS WORKFLOW               -->
+    <!-- (Active when viewing a live or single-repository run)                -->
+    <!-- ==================================================================== -->
+    <main id="single-repo-view-container" style="display: none;">
+      <!-- Single Repo Header & Overview Card -->
+      <section class="single-repo-header-card" id="single-repo-header-card">
+        <div class="repo-title-row">
+          <div class="repo-main-meta">
+            <h2 id="single-repo-name" class="single-repo-title">owner/repository</h2>
+            <a id="single-repo-github-link" href="#" target="_blank" rel="noopener noreferrer" class="github-external-link" title="Open repository on GitHub">
+              <span>View on GitHub</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            </a>
+          </div>
+          <div class="repo-meta-pills" id="single-repo-meta-pills">
+            <span class="meta-pill" id="single-repo-lang">Language: Python</span>
+            <span class="meta-pill" id="single-repo-stars">Stars: --</span>
+            <span class="meta-pill" id="single-repo-forks">Forks: --</span>
+            <span class="badge-authentic" id="single-repo-data-badge">100% Authentic Live Data</span>
+            <span class="meta-pill" id="single-repo-coverage-badge">Coverage: Full</span>
+          </div>
         </div>
-      </div>
-      <div class="kpi-card" id="kpi-clusters">
-        <div class="kpi-label">Clustered Repos</div>
-        <div class="kpi-value" id="val-clusters">--</div>
-        <div class="kpi-meta" id="val-clusters-sub">Across 4 K-Means clusters</div>
-      </div>
-    </section>
 
-    <!-- Section B: Cluster Exploration -->
-    <section class="dashboard-section" id="cluster-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Spark MLlib K-Means Clusters</h2>
-          <p class="section-subtitle">Unsupervised clustering on 6 normalized repository-level commit features (K=4, Seed=42)</p>
+        <!-- Single Repo Primary Metrics Grid -->
+        <div class="single-repo-stats-grid">
+          <div class="repo-stat-item">
+            <span class="stat-label">Commits Analyzed</span>
+            <span class="stat-val" id="single-stat-commits">--</span>
+            <span class="stat-sub" id="single-stat-history-mode">Recent Limit (10)</span>
+          </div>
+          <div class="repo-stat-item">
+            <span class="stat-label">Date Range Analyzed</span>
+            <span class="stat-val" id="single-stat-daterange" style="font-size: 1rem;">--</span>
+            <span class="stat-sub" id="single-stat-duration">Duration: -- days</span>
+          </div>
+          <div class="repo-stat-item">
+            <span class="stat-label">Code Churn (Add / Del)</span>
+            <span class="stat-val churn-val" id="single-stat-churn">
+              <span class="churn-add" id="single-stat-add">+0</span> / <span class="churn-del" id="single-stat-del">-0</span>
+            </span>
+            <span class="stat-sub" id="single-stat-lines">Net Lines Changed: 0</span>
+          </div>
+          <div class="repo-stat-item">
+            <span class="stat-label">Files & Merges</span>
+            <span class="stat-val" id="single-stat-files-merges">0 / 0</span>
+            <span class="stat-sub" id="single-stat-merge-ratio">Merge Ratio: 0.0%</span>
+          </div>
+          <div class="repo-stat-item">
+            <span class="stat-label">Distinct Authors</span>
+            <span class="stat-val" id="single-stat-authors">--</span>
+            <span class="stat-sub" id="single-stat-attribution-sub">From Commit Identity</span>
+          </div>
         </div>
-      </div>
 
-      <!-- Cluster Cards -->
-      <div class="cluster-cards-grid" id="cluster-cards-container">
-        <!-- Rendered by app.js -->
-      </div>
-
-      <!-- Feature Comparison Chart -->
-      <div class="chart-container" id="cluster-chart-container">
-        <h3 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary);">
-          Cluster Feature Comparison (Average Values)
-        </h3>
-        <div id="cluster-svg-chart" style="width: 100%; min-height: 220px;">
-          <!-- SVG rendered dynamically by app.js -->
+        <!-- Missing stats alert (if applicable) -->
+        <div id="single-repo-missing-stats-alert" class="missing-stats-notice" style="display: none;">
+          ℹ Missing GitHub diff statistics: <strong id="val-missing-stats-count">0</strong> commits did not include file diff stats and are preserved as unavailable (N/A).
         </div>
-        <div class="chart-legend" id="cluster-chart-legend">
-          <!-- Rendered dynamically by app.js -->
-        </div>
-      </div>
-    </section>
 
-    <!-- Section C: Repository Profiles & Table -->
-    <section class="dashboard-section" id="repo-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Repository Feature Profiles</h2>
-          <p class="section-subtitle">Aggregated metrics from MapReduce streaming pipeline with assigned Spark MLlib clusters</p>
+        <!-- Export toolbar -->
+        <div class="export-actions-row">
+          <span class="export-label">Export Single Repository Analysis:</span>
+          <button id="btn-export-commits-csv" class="btn-export" type="button" title="Download commit records as CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download Commits (CSV)
+          </button>
+          <button id="btn-export-repo-json" class="btn-export" type="button" title="Download complete analysis payload as JSON">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download Analysis (JSON)
+          </button>
         </div>
-      </div>
+      </section>
 
-      <!-- Toolbar -->
-      <div class="toolbar" id="table-toolbar">
-        <div class="search-box">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="input-search" class="search-input" placeholder="Search by repository name or language…" autocomplete="off">
+      <!-- Section: Temporal Commit Activity & Line Churn Chart -->
+      <section class="dashboard-section" id="single-repo-temporal-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">Temporal Activity & Code Churn</h3>
+            <p class="section-subtitle">Chronological distribution of commit frequency, additions, and deletions over time</p>
+          </div>
+          <div class="chart-time-toggle">
+            <button id="btn-granularity-daily" class="btn-granularity active" type="button">Daily</button>
+            <button id="btn-granularity-weekly" class="btn-granularity" type="button">Weekly</button>
+            <button id="btn-granularity-monthly" class="btn-granularity" type="button">Monthly</button>
+          </div>
         </div>
-        <select id="select-cluster-filter" class="filter-select" aria-label="Filter by cluster">
-          <option value="all">All Clusters</option>
-          <option value="0">Cluster 0</option>
-          <option value="1">Cluster 1</option>
-          <option value="2">Cluster 2</option>
-          <option value="3">Cluster 3</option>
-        </select>
-        <select id="select-lang-filter" class="filter-select" aria-label="Filter by programming language">
-          <option value="all">All Languages</option>
-        </select>
-        <button id="btn-reset-filters" class="btn-secondary" type="button">Reset Filters</button>
-      </div>
 
-      <!-- Table -->
-      <div class="table-responsive">
-        <table class="data-table" id="repos-table">
-          <thead>
-            <tr>
-              <th data-col="repo_name" id="th-repo-name">Repository</th>
-              <th data-col="language" id="th-language">Language</th>
-              <th data-col="stars" id="th-stars">Stars</th>
-              <th data-col="commit_count" id="th-commits">Commits</th>
-              <th data-col="distinct_authors" id="th-authors">Authors</th>
-              <th data-col="merge_ratio" id="th-merge-ratio">Merge Ratio</th>
-              <th data-col="avg_additions" id="th-avg-add">Avg Additions</th>
-              <th data-col="avg_deletions" id="th-avg-del">Avg Deletions</th>
-              <th data-col="avg_lines_changed" id="th-avg-lines">Avg Lines</th>
-              <th data-col="avg_files_changed" id="th-avg-files">Avg Files</th>
-              <th data-col="cluster" id="th-cluster">Cluster</th>
-            </tr>
-          </thead>
-          <tbody id="table-body">
-            <tr>
-              <td colspan="11" class="empty-state">Loading repository data…</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Section D: Data Quality & Provenance Pipeline -->
-    <section class="dashboard-section" id="provenance-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Data Pipeline Provenance & Artifact Status</h2>
-          <p class="section-subtitle">Real-time status of pipeline artifacts loaded from project filesystem</p>
+        <div class="chart-container" id="single-repo-timeseries-container">
+          <div id="single-repo-timeseries-svg" style="width: 100%; min-height: 250px;">
+            <!-- Rendered by app.js -->
+          </div>
+          <div class="chart-legend" id="single-repo-chart-legend">
+            <div class="legend-item"><span class="legend-color-dot" style="background: var(--accent-cyan);"></span> Commits Count</div>
+            <div class="legend-item"><span class="legend-color-dot" style="background: var(--accent-emerald);"></span> Additions (+)</div>
+            <div class="legend-item"><span class="legend-color-dot" style="background: var(--accent-rose);"></span> Deletions (-)</div>
+          </div>
         </div>
-      </div>
-      <div class="pipeline-flow-grid" id="pipeline-flow-container">
-        <!-- Rendered by app.js -->
-      </div>
-    </section>
+      </section>
+
+      <!-- Section: Author Contributions & Attribution Limitations -->
+      <section class="dashboard-section" id="single-repo-authors-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">Contributions by Author</h3>
+            <p class="section-subtitle">Commit volumes, lines changed, and active timeframes per author identity</p>
+          </div>
+        </div>
+
+        <div class="attribution-warning-card">
+          <span class="warning-icon">ℹ</span>
+          <p>
+            <strong>Author Attribution Notice:</strong> Author identity is derived strictly from git commit metadata author strings. Authors committing under different names or email aliases appear as separate entities.
+          </p>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="single-author-table">
+            <thead>
+              <tr>
+                <th>Author</th>
+                <th>Commits</th>
+                <th>Share</th>
+                <th>Additions (+)</th>
+                <th>Deletions (-)</th>
+                <th>Lines Changed</th>
+                <th>Merges</th>
+                <th>Active Span</th>
+              </tr>
+            </thead>
+            <tbody id="single-author-table-body">
+              <!-- Rendered by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section: Commit-Level K-Means Clustering -->
+      <section class="dashboard-section" id="single-repo-clustering-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">Commit-Level K-Means Clustering</h3>
+            <p class="section-subtitle">Unsupervised clustering of individual commits on 5 normalized diff features</p>
+          </div>
+          <div class="clustering-eval-card" id="commit-clustering-eval-card">
+            <div class="eval-metric-group">
+              <span class="eval-metric-label">Silhouette Coefficient:</span>
+              <span class="eval-metric-value" id="val-commit-silhouette">--</span>
+            </div>
+            <div class="eval-metric-measure">
+              Measure: Squared Euclidean Distance &bull; Normalized Range: [-1.0, +1.0]
+            </div>
+          </div>
+        </div>
+
+        <div id="commit-clustering-notice" class="clustering-notice-box" style="display: none;">
+          <!-- Informative skip reason if < 3 commits or degenerate -->
+        </div>
+
+        <div class="cluster-cards-grid" id="commit-cluster-cards-container">
+          <!-- Rendered by app.js -->
+        </div>
+      </section>
+
+      <!-- Section: Frequently Changed Files -->
+      <section class="dashboard-section" id="single-repo-files-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">Frequently Changed Files</h3>
+            <p class="section-subtitle">Files touched most frequently across analyzed commits in this run</p>
+          </div>
+        </div>
+
+        <div id="files-table-container">
+          <table class="data-table" id="single-files-table">
+            <thead>
+              <tr>
+                <th>File Path</th>
+                <th>Commits Touched</th>
+              </tr>
+            </thead>
+            <tbody id="single-files-table-body">
+              <!-- Rendered by app.js -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section: Commit Records Table with Live Client Filtering -->
+      <section class="dashboard-section" id="single-repo-commits-table-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">Commit-Level Records Explorer</h3>
+            <p class="section-subtitle">Granular commit log with change statistics, timestamps, and clustering assignments</p>
+          </div>
+        </div>
+
+        <!-- Commit Filters Toolbar -->
+        <div class="toolbar" id="commit-table-toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="input-commit-search" class="search-input" placeholder="Search commit message or SHA…" autocomplete="off">
+          </div>
+          <select id="select-commit-author-filter" class="filter-select" aria-label="Filter by author">
+            <option value="all">All Authors</option>
+          </select>
+          <select id="select-commit-cluster-filter" class="filter-select" aria-label="Filter by cluster">
+            <option value="all">All Clusters</option>
+          </select>
+          <select id="select-commit-merge-filter" class="filter-select" aria-label="Filter merges">
+            <option value="all">All Commits</option>
+            <option value="merges_only">Merges Only</option>
+            <option value="regular_only">Non-Merges Only</option>
+          </select>
+          <button id="btn-reset-commit-filters" class="btn-secondary" type="button">Reset Filters</button>
+        </div>
+
+        <!-- Commits Table -->
+        <div class="table-responsive">
+          <table class="data-table" id="commits-detail-table">
+            <thead>
+              <tr>
+                <th data-col="sha_short">SHA</th>
+                <th data-col="date">Timestamp</th>
+                <th data-col="author">Author</th>
+                <th data-col="message_subject">Message</th>
+                <th data-col="additions">Additions <span class="col-tag tag-model">Model</span></th>
+                <th data-col="deletions">Deletions <span class="col-tag tag-model">Model</span></th>
+                <th data-col="lines_changed">Lines <span class="col-tag tag-model">Model</span></th>
+                <th data-col="files_changed">Files <span class="col-tag tag-model">Model</span></th>
+                <th data-col="is_merge">Merge</th>
+                <th data-col="cluster">Cluster <span class="col-tag tag-group">Group</span></th>
+              </tr>
+            </thead>
+            <tbody id="commits-detail-table-body">
+              <tr>
+                <td colspan="10" class="empty-state">Loading commit records…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- ==================================================================== -->
+    <!-- VIEW CONTAINER B: MULTI-REPOSITORY COHORT & SAMPLE DATASET          -->
+    <!-- (Active when viewing baseline sample or multi-repository runs)       -->
+    <!-- ==================================================================== -->
+    <main id="multi-repo-view-container">
+      <!-- Section A: Overview KPIs -->
+      <section class="overview-grid" id="overview-grid" aria-label="Pipeline Metrics Overview">
+        <div class="kpi-card" id="kpi-repos">
+          <div class="kpi-label">Repositories</div>
+          <div class="kpi-value" id="val-repos">--</div>
+          <div class="kpi-meta" id="val-repos-meta">Repository count</div>
+        </div>
+        <div class="kpi-card" id="kpi-commits">
+          <div class="kpi-label">Commits Collected</div>
+          <div class="kpi-value" id="val-commits">--</div>
+          <div class="kpi-meta" id="val-commits-meta">Sampled commit history</div>
+        </div>
+        <div class="kpi-card" id="kpi-enrichment">
+          <div class="kpi-label">Enriched Commits</div>
+          <div class="kpi-value" id="val-enriched">--</div>
+          <div class="kpi-meta" id="val-enriched-sub">
+            <span class="badge-authentic">Authentic / Mock Status</span>
+          </div>
+        </div>
+        <div class="kpi-card" id="kpi-clusters">
+          <div class="kpi-label">Clustered Repos</div>
+          <div class="kpi-value" id="val-clusters">--</div>
+          <div class="kpi-meta" id="val-clusters-sub">Across K-Means clusters</div>
+        </div>
+      </section>
+
+      <!-- Section B: Cluster Exploration -->
+      <section class="dashboard-section" id="cluster-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Spark MLlib K-Means Clusters</h2>
+            <p class="section-subtitle" id="cluster-subtitle">Unsupervised clustering on 6 normalized repository-level commit features</p>
+          </div>
+          <div class="clustering-eval-card" id="clustering-eval-card">
+            <div class="eval-metric-group">
+              <span class="eval-metric-label">Silhouette Coefficient:</span>
+              <span class="eval-metric-value" id="val-silhouette">--</span>
+            </div>
+            <div class="eval-metric-measure" id="val-silhouette-measure">
+              Measure: Squared Euclidean Distance &bull; Normalized Range: [-1.0, +1.0]
+            </div>
+          </div>
+        </div>
+
+        <!-- Cluster Cards -->
+        <div class="cluster-cards-grid" id="cluster-cards-container">
+          <!-- Rendered by app.js -->
+        </div>
+
+        <!-- Feature Comparison Chart -->
+        <div class="chart-container" id="cluster-chart-container">
+          <h3 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 4px; color: var(--text-secondary);">
+            K-Means Model Inputs: Feature Comparison (Cluster Averages)
+          </h3>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+            Normalized features scaled via StandardScaler (zero mean, unit variance). Descriptive metadata (language, stars, distinct authors) are excluded from clustering distance calculations.
+          </p>
+          <div id="cluster-svg-chart" style="width: 100%; min-height: 220px;">
+            <!-- SVG rendered dynamically by app.js -->
+          </div>
+          <div class="chart-legend" id="cluster-chart-legend">
+            <!-- Rendered dynamically by app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Section C: Repository Profiles & Table -->
+      <section class="dashboard-section" id="repo-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Repository Feature Profiles</h2>
+            <p class="section-subtitle">Aggregated metrics from MapReduce streaming pipeline with assigned Spark MLlib clusters</p>
+          </div>
+          <div class="export-actions-row">
+            <button id="btn-export-multi-csv" class="btn-export" type="button" title="Download repository table as CSV">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export Repositories (CSV)
+            </button>
+            <button id="btn-export-multi-json" class="btn-export" type="button" title="Download complete run payload as JSON">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export Analysis (JSON)
+            </button>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="toolbar" id="table-toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="input-search" class="search-input" placeholder="Search by repository name or language…" autocomplete="off">
+          </div>
+          <select id="select-cluster-filter" class="filter-select" aria-label="Filter by cluster">
+            <option value="all">All Clusters</option>
+            <option value="0">Cluster 0</option>
+            <option value="1">Cluster 1</option>
+            <option value="2">Cluster 2</option>
+            <option value="3">Cluster 3</option>
+          </select>
+          <select id="select-lang-filter" class="filter-select" aria-label="Filter by programming language">
+            <option value="all">All Languages</option>
+          </select>
+          <button id="btn-reset-filters" class="btn-secondary" type="button">Reset Filters</button>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+          <table class="data-table" id="repos-table">
+            <thead>
+              <tr>
+                <th data-col="repo_name" id="th-repo-name" title="Repository identifier">Repository</th>
+                <th data-col="language" id="th-language" title="Descriptive repository metadata (not a model input)">Language <span class="col-tag tag-meta">Meta</span></th>
+                <th data-col="stars" id="th-stars" title="Descriptive repository metadata (not a model input)">Stars <span class="col-tag tag-meta">Meta</span></th>
+                <th data-col="commit_count" id="th-commits" title="Model input feature (standardized commit volume)">Commits <span class="col-tag tag-model">Model</span></th>
+                <th data-col="distinct_authors" id="th-authors" title="Descriptive author statistics (not a model input)">Authors <span class="col-tag tag-desc">Desc</span></th>
+                <th data-col="merge_ratio" id="th-merge-ratio" title="Model input feature (proportion of merge commits)">Merge Ratio <span class="col-tag tag-model">Model</span></th>
+                <th data-col="avg_additions" id="th-avg-add" title="Model input feature (mean additions per commit)">Avg Additions <span class="col-tag tag-model">Model</span></th>
+                <th data-col="avg_deletions" id="th-avg-del" title="Model input feature (mean deletions per commit)">Avg Deletions <span class="col-tag tag-model">Model</span></th>
+                <th data-col="avg_lines_changed" id="th-avg-lines" title="Model input feature (mean lines changed per commit)">Avg Lines <span class="col-tag tag-model">Model</span></th>
+                <th data-col="avg_files_changed" id="th-avg-files" title="Model input feature (mean files changed per commit)">Avg Files <span class="col-tag tag-model">Model</span></th>
+                <th data-col="cluster" id="th-cluster" title="Arbitrary categorical group label assigned by K-Means (not a ranking)">Cluster <span class="col-tag tag-group">Group</span></th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr>
+                <td colspan="11" class="empty-state">Loading repository data…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section D: Data Quality & Provenance Pipeline -->
+      <section class="dashboard-section" id="provenance-section">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Data Pipeline Provenance & Artifact Status</h2>
+            <p class="section-subtitle">Real-time status of pipeline artifacts loaded from project filesystem</p>
+          </div>
+        </div>
+        <div class="pipeline-flow-grid" id="pipeline-flow-container">
+          <!-- Rendered by app.js -->
+        </div>
+      </section>
+    </main>
 
     <!-- Footer -->
     <footer class="dashboard-footer">

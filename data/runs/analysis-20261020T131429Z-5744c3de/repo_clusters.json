@@ -1,0 +1,53 @@
+[
+  {
+    "cluster": 0,
+    "repo_name": "encode/httpx",
+    "repo_id": 179492861,
+    "commit_count": 10,
+    "total_additions": 57,
+    "total_deletions": 33,
+    "total_lines_changed": 90,
+    "total_files_changed": 15,
+    "merge_count": 0,
+    "merge_ratio": 0.0,
+    "avg_additions": 5.7,
+    "avg_deletions": 3.3,
+    "avg_lines_changed": 9.0,
+    "avg_files_changed": 1.5,
+    "distinct_authors": 9
+  },
+  {
+    "cluster": 0,
+    "repo_name": "psf/requests",
+    "repo_id": 1362490,
+    "commit_count": 10,
+    "total_additions": 20,
+    "total_deletions": 20,
+    "total_lines_changed": 40,
+    "total_files_changed": 14,
+    "merge_count": 0,
+    "merge_ratio": 0.0,
+    "avg_additions": 2.0,
+    "avg_deletions": 2.0,
+    "avg_lines_changed": 4.0,
+    "avg_files_changed": 1.4,
+    "distinct_authors": 2
+  },
+  {
+    "cluster": 1,
+    "repo_name": "pallets/flask",
+    "repo_id": 596892,
+    "commit_count": 10,
+    "total_additions": 205,
+    "total_deletions": 915,
+    "total_lines_changed": 1120,
+    "total_files_changed": 37,
+    "merge_count": 2,
+    "merge_ratio": 0.2,
+    "avg_additions": 20.5,
+    "avg_deletions": 91.5,
+    "avg_lines_changed": 112.0,
+    "avg_files_changed": 3.7,
+    "distinct_authors": 1
+  }
+]

@@ -22,6 +22,9 @@ from dashboard.server import (
     load_json,
     load_jsonl,
     get_dashboard_data,
+    compute_single_repo_analytics,
+    generate_commits_csv,
+    generate_repos_csv,
     DashboardHandler,
     HTTPServer,
 )
@@ -157,6 +160,145 @@ class TestDashboardHttpServer:
         resp = requests.head(f"{dashboard_server}/")
         assert resp.status_code == 200
         assert int(resp.headers.get("Content-Length", 0)) > 0
+
+    def test_get_export_csv_and_json(self, dashboard_server):
+        # CSV Export
+        resp_csv = requests.get(f"{dashboard_server}/api/export?run=sample&format=csv")
+        assert resp_csv.status_code == 200
+        assert "text/csv" in resp_csv.headers.get("Content-Type", "")
+        assert "repo_name" in resp_csv.text
+        assert "torvalds/linux" in resp_csv.text
+
+        # JSON Export
+        resp_json = requests.get(f"{dashboard_server}/api/export?run=sample&format=json")
+        assert resp_json.status_code == 200
+        assert "application/json" in resp_json.headers.get("Content-Type", "")
+        data = resp_json.json()
+        assert "overview" in data
+        assert data["overview"]["total_repositories"] == 20
+
+    def test_post_analyze_invalid_url(self, dashboard_server):
+        resp = requests.post(
+            f"{dashboard_server}/api/analyze",
+            json={"repository": "https://gitlab.com/invalid/repo", "mode": "recent_limit", "limit": 5},
+        )
+        assert resp.status_code == 400
+        data = resp.json()
+        assert "error" in data
+        assert "Unsupported host" in data["error"] or "invalid" in data["error"].lower()
+
+    def test_post_analyze_empty_body(self, dashboard_server):
+        resp = requests.post(f"{dashboard_server}/api/analyze", json={})
+        assert resp.status_code == 400
+        data = resp.json()
+        assert "error" in data
+
+    def test_get_analyze_status_validation(self, dashboard_server):
+        # Missing run_id
+        resp1 = requests.get(f"{dashboard_server}/api/analyze/status")
+        assert resp1.status_code == 400
+
+        # Nonexistent run_id
+        resp2 = requests.get(f"{dashboard_server}/api/analyze/status?run_id=analysis-does-not-exist")
+        assert resp2.status_code == 404
+
+
+class TestSingleRepoAnalyticsLogic:
+    def test_compute_single_repo_analytics(self):
+        repos = [{"repo_name": "test/repo", "language": "Python", "stars": 100}]
+        commits = [
+            {"commit_sha": "c1", "author_timestamp": "2026-01-01T10:00:00Z", "parent_count": 1},
+            {"commit_sha": "c2", "author_timestamp": "2026-01-02T12:00:00Z", "parent_count": 2},
+        ]
+        enriched = [
+            {
+                "commit_sha": "c1",
+                "author_identity": "Alice",
+                "author_timestamp": "2026-01-01T10:00:00Z",
+                "additions": 10,
+                "deletions": 2,
+                "lines_changed": 12,
+                "files_changed": 2,
+                "parent_count": 1,
+                "stats_available": True,
+                "file_names": ["README.md", "main.py"],
+            },
+            {
+                "commit_sha": "c2",
+                "author_identity": "Bob",
+                "author_timestamp": "2026-01-02T12:00:00Z",
+                "additions": None,
+                "deletions": None,
+                "lines_changed": None,
+                "files_changed": None,
+                "parent_count": 2,
+                "stats_available": False,
+                "file_names": [],
+            },
+        ]
+
+        res = compute_single_repo_analytics(repos, commits, enriched, {"history_mode": "recent_limit", "requested_limit": 2})
+        assert res["repository"] == "test/repo"
+        s = res["summary"]
+        assert s["total_commits"] == 2
+        assert s["total_enriched"] == 2
+        assert s["stats_available_count"] == 1
+        assert s["missing_stats_count"] == 1
+        assert s["total_additions"] == 10
+        assert s["total_deletions"] == 2
+        assert s["merge_count"] == 1
+        assert s["merge_ratio"] == 0.5
+        assert s["date_range"]["earliest"] == "2026-01-01T10:00:00Z"
+        assert s["date_range"]["latest"] == "2026-01-02T12:00:00Z"
+
+        # Authors
+        authors = res["author_contributions"]
+        assert len(authors) == 2
+        author_names = {a["author"] for a in authors}
+        assert author_names == {"Alice", "Bob"}
+
+        # Frequently changed files
+        f_paths = [f["path"] for f in res["frequently_changed_files"]]
+        assert "README.md" in f_paths
+
+        # Detailed commits: c2 missing stats must remain None
+        details = res["commits_detail"]
+        assert len(details) == 2
+        c2_detail = next(d for d in details if d["sha"] == "c2")
+        assert c2_detail["additions"] is None
+        assert c2_detail["stats_available"] is False
+
+    def test_csv_generators(self):
+        commit_details = [
+            {
+                "sha": "1234567890abcdef",
+                "date": "2026-01-01T10:00:00Z",
+                "author": "Alice",
+                "message_subject": "Initial commit",
+                "additions": 10,
+                "deletions": 2,
+                "lines_changed": 12,
+                "files_changed": 2,
+                "is_merge": False,
+                "cluster": 0,
+            },
+            {
+                "sha": "abcdef1234567890",
+                "date": "2026-01-02T10:00:00Z",
+                "author": "Bob",
+                "message_subject": "Merge PR",
+                "additions": None,
+                "deletions": None,
+                "lines_changed": None,
+                "files_changed": None,
+                "is_merge": True,
+                "cluster": None,
+            },
+        ]
+        csv_str = generate_commits_csv(commit_details)
+        assert "sha,date,author,message_subject,additions,deletions" in csv_str
+        assert "1234567890abcdef" in csv_str
+        assert "N/A" in csv_str  # Missing stats output as N/A
 
 
 def math_close(a, b, tol=0.1):

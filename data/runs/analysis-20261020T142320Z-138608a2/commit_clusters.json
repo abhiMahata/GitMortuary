@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "reason": "",
+  "k": 2,
+  "seed": 42,
+  "silhouette": 1.0,
+  "distance_measure": "squaredEuclidean",
+  "profiles": {
+    "0": {
+      "cluster_id": 0,
+      "label": "Minor Edits & Documentation",
+      "count": 1,
+      "percentage": 20.0,
+      "avg_additions": 3.0,
+      "avg_deletions": 3.0,
+      "avg_lines_changed": 6.0,
+      "avg_files_changed": 1.0,
+      "merge_ratio": 0.0
+    },
+    "1": {
+      "cluster_id": 1,
+      "label": "Minor Edits & Documentation",
+      "count": 4,
+      "percentage": 80.0,
+      "avg_additions": 1.0,
+      "avg_deletions": 1.0,
+      "avg_lines_changed": 2.0,
+      "avg_files_changed": 1.0,
+      "merge_ratio": 0.0
+    }
+  },
+  "assignments": {
+    "611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60": 0,
+    "dae7ef63b4df6eded86637f251fc4e3a06c3b479": 1,
+    "5460f467b02e49471c0fd6cfc9ca0adab6351f98": 1,
+    "6af0b94158bbe10c45e754e85f9701f401e6aa9c": 1,
+    "8f8b212de8c2129d7954c6cd373762880375620a": 1
+  },
+  "valid_commits_count": 5,
+  "feature_columns": [
+    "additions",
+    "deletions",
+    "lines_changed",
+    "files_changed",
+    "parent_count"
+  ]
+}

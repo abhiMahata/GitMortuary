@@ -211,8 +211,13 @@ def run_pipeline(
 
     validate_analysis_directory(analysis_dir)
 
-    if analysis_dir.exists() and any(analysis_dir.iterdir()):
-        raise ValueError(f"Output directory '{analysis_dir}' already exists and is not empty.")
+    if analysis_dir.exists():
+        # Disallow reusing an output directory that already has a pipeline manifest or non-repo contents
+        if (analysis_dir / "pipeline_manifest.json").exists():
+            raise ValueError(f"Output directory '{analysis_dir}' already contains a completed pipeline manifest.")
+        non_repo_items = [p.name for p in analysis_dir.iterdir() if p.name != "repositories"]
+        if non_repo_items:
+            raise ValueError(f"Output directory '{analysis_dir}' already exists and contains unexpected items: {non_repo_items}")
 
     analysis_dir.mkdir(parents=True, exist_ok=True)
     repos_sub_dir = analysis_dir / "repositories"
@@ -318,14 +323,38 @@ def run_pipeline(
             repo_run_dir = repos_sub_dir / repo_slug
 
             try:
-                run_manifest = analyze_repository(
-                    identifier=repo_identifier,
-                    output_dir=repo_run_dir,
-                    commit_limit=commit_limit,
-                    token=token,
-                    timeout=timeout,
-                    verbose=verbose,
-                )
+                # Reuse pre-existing authentic repository data if already present in target directory
+                if (
+                    repo_run_dir.exists()
+                    and (repo_run_dir / "enriched_commits.jsonl").exists()
+                    and (repo_run_dir / "repositories.jsonl").exists()
+                ):
+                    _log(f"  ✓ Reusing existing authentic data for {repo_identifier} (avoids API quota consumption)")
+                    manifest_file = repo_run_dir / "manifest.json"
+                    run_manifest = {}
+                    if manifest_file.exists():
+                        try:
+                            with manifest_file.open("r", encoding="utf-8") as fh:
+                                run_manifest = json.load(fh)
+                        except Exception:
+                            run_manifest = {}
+
+                    c_file = repo_run_dir / "commits.jsonl"
+                    e_file = repo_run_dir / "enriched_commits.jsonl"
+                    c_count = sum(1 for l in c_file.open("r", encoding="utf-8") if l.strip()) if c_file.exists() else 0
+                    e_count = sum(1 for l in e_file.open("r", encoding="utf-8") if l.strip()) if e_file.exists() else 0
+
+                    run_manifest.setdefault("status", "truncated" if c_count >= commit_limit else "complete")
+                    run_manifest.setdefault("counts", {"commits": c_count, "enriched_commits": e_count})
+                else:
+                    run_manifest = analyze_repository(
+                        identifier=repo_identifier,
+                        output_dir=repo_run_dir,
+                        commit_limit=commit_limit,
+                        token=token,
+                        timeout=timeout,
+                        verbose=verbose,
+                    )
                 ingestion_runs.append({
                     "repository": repo_identifier,
                     "status": run_manifest["status"],

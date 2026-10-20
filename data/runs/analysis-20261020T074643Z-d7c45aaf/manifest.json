@@ -1,0 +1,80 @@
+{
+  "manifest_version": "1.0",
+  "analysis_id": "analysis-20261020T074643Z-d7c45aaf",
+  "type": "orchestrated_analysis",
+  "started_at": "2026-10-20T07:46:43.124493+00:00",
+  "completed_at": null,
+  "duration_seconds": 0.84,
+  "status": "failed",
+  "repositories_requested": [
+    "psf/requests",
+    "pallets/flask",
+    "encode/httpx"
+  ],
+  "commit_limit": 10,
+  "stages": {
+    "ingestion": {
+      "status": "failed",
+      "repositories_attempted": 3,
+      "repositories_succeeded": 0,
+      "repositories_failed": 3,
+      "runs": [
+        {
+          "repository": "psf/requests",
+          "status": "failed",
+          "error": "GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s."
+        },
+        {
+          "repository": "pallets/flask",
+          "status": "failed",
+          "error": "GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s."
+        },
+        {
+          "repository": "encode/httpx",
+          "status": "failed",
+          "error": "GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s."
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "pending",
+      "mode": "local",
+      "features_count": 0,
+      "output_file": "repo_features.jsonl"
+    },
+    "spark": {
+      "status": "pending",
+      "k": 2,
+      "seed": 42,
+      "clusters_count": 0,
+      "repositories_clustered": 0,
+      "silhouette": null,
+      "silhouette_status": "pending",
+      "silhouette_reason": null,
+      "output_file": "repo_clusters.json"
+    }
+  },
+  "counts": {
+    "repositories": 0,
+    "commits": 0,
+    "enriched_commits": 0,
+    "authentic_records": 0,
+    "synthetic_records": 0
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "features": "repo_features.jsonl",
+    "clusters": null,
+    "manifest": "pipeline_manifest.json"
+  },
+  "warnings": [
+    "Ingestion failed for psf/requests: GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s.",
+    "Ingestion failed for pallets/flask: GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s.",
+    "Ingestion failed for encode/httpx: GitHub API rate limit exceeded (HTTP 403). Remaining: 0. Resets in 2980s."
+  ],
+  "errors": [
+    "All requested repositories failed ingestion. Pipeline halted."
+  ]
+}

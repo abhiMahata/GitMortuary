@@ -384,10 +384,21 @@ class GitHubClient:
         has_more = False
 
         effective_per_page = min(max(1, per_page), 100)
+        is_unlimited = (limit is None or limit <= 0)
 
-        while len(commits) < limit:
-            remaining_needed = limit - len(commits)
+        while True:
+            if not is_unlimited and len(commits) >= limit:
+                has_more = True
+                break
+
+            remaining_needed = (limit - len(commits)) if not is_unlimited else effective_per_page
             current_per_page = min(effective_per_page, remaining_needed)
+
+            # Check rate limit headroom
+            remaining_quota = self.last_rate_limit.get("remaining")
+            if remaining_quota is not None and remaining_quota <= 1:
+                has_more = True
+                break
 
             try:
                 _, page_data, response = self.request(
@@ -418,11 +429,11 @@ class GitHubClient:
 
             page += 1
 
-        # If we reached limit and there are more commits available in the repository
-        if len(commits) >= limit:
+        if not is_unlimited and len(commits) >= limit:
             has_more = True
+            return commits[:limit], has_more
 
-        return commits[:limit], has_more
+        return commits, has_more
 
     def get_commit_details(self, owner: str, repo: str, commit_sha: str) -> dict:
         """Fetch detailed commit diff statistics and file counts from /repos/{owner}/{repo}/commits/{sha}."""
@@ -486,6 +497,7 @@ def enrich_commit_authentic(commit: dict, details: dict | None) -> dict:
         enriched["lines_changed"] = None
         enriched["stats_available"] = False
         enriched["files_available"] = False
+        enriched["file_names"] = []
     else:
         stats = details.get("stats")
         files = details.get("files")
@@ -504,9 +516,11 @@ def enrich_commit_authentic(commit: dict, details: dict | None) -> dict:
         if files is not None:
             enriched["files_changed"] = len(files)
             enriched["files_available"] = True
+            enriched["file_names"] = [f.get("filename") for f in files if isinstance(f, dict) and "filename" in f][:20]
         else:
             enriched["files_changed"] = None
             enriched["files_available"] = False
+            enriched["file_names"] = []
 
     enriched["synthetic"] = False
     return enriched
@@ -553,6 +567,7 @@ def analyze_repository(
     timeout: float = DEFAULT_TIMEOUT,
     client: GitHubClient | None = None,
     verbose: bool = True,
+    on_progress=None,
 ) -> dict:
     """
     Main entry point for authentic repository ingestion.
@@ -583,6 +598,8 @@ def analyze_repository(
     if client is None:
         client = GitHubClient(token=token, timeout=timeout)
 
+    history_mode = "full_history" if (commit_limit is None or commit_limit <= 0) else "recent_limit"
+
     manifest: dict = {
         "manifest_version": "1.0",
         "run_id": target_dir.name,
@@ -592,7 +609,13 @@ def analyze_repository(
         "completed_at": None,
         "duration_seconds": None,
         "status": "in_progress",
-        "commit_limit": commit_limit,
+        "history_mode": history_mode,
+        "commit_limit": commit_limit if (commit_limit and commit_limit > 0) else None,
+        "requested_limit": commit_limit if (commit_limit and commit_limit > 0) else "all",
+        "date_range": {
+            "earliest": None,
+            "latest": None,
+        },
         "completeness": {
             "is_complete": False,
             "truncated_by_limit": False,
@@ -659,6 +682,8 @@ def analyze_repository(
             fh.write(json.dumps(norm_repo) + "\n")
         manifest["counts"]["repositories"] = 1
         _log(f"  ✓ Repository '{norm_repo['repo_name']}' loaded (ID: {norm_repo['repo_id']}, Stars: {norm_repo['stars']})")
+        if on_progress:
+            on_progress("metadata", f"Loaded repository '{norm_repo['repo_name']}' ({norm_repo['stars']} stars)", 20)
 
         # Step 2: Retrieve Commits
         _log(f"Fetching commits (limit: {commit_limit}) …")
@@ -670,6 +695,8 @@ def analyze_repository(
             manifest["completeness"]["has_more_commits"] = False
             _write_manifest("empty")
             _log("  ⚠ Repository is empty (0 commits found).")
+            if on_progress:
+                on_progress("complete", "Repository has 0 commits.", 100)
             return manifest
 
         manifest["counts"]["commits"] = len(raw_commits)
@@ -685,7 +712,15 @@ def analyze_repository(
                 normalized_commits.append(norm_c)
                 fh.write(json.dumps(norm_c) + "\n")
 
+        dates = [c["author_timestamp"] for c in normalized_commits if c.get("author_timestamp")]
+        if dates:
+            manifest["date_range"]["earliest"] = min(dates)
+            manifest["date_range"]["latest"] = max(dates)
+
         _log(f"  ✓ {len(normalized_commits)} commit records saved.")
+        if on_progress:
+            on_progress("commits", f"Retrieved {len(normalized_commits)} commit records", 45)
+
         if has_more:
             manifest["warnings"].append(
                 f"History truncated by commit limit ({commit_limit}). Repository contains additional commits."
@@ -709,6 +744,8 @@ def analyze_repository(
                         "Halting per-commit enrichment to protect quota."
                     )
                     manifest["warnings"].append(warning_msg)
+                    manifest["completeness"]["truncated_by_limit"] = True
+                    manifest["completeness"]["is_complete"] = False
                     _log(f"  ⚠ {warning_msg}")
                     # Write remaining commits without stats
                     for unproc in normalized_commits[idx - 1:]:
@@ -728,6 +765,10 @@ def analyze_repository(
                 fh.flush()
                 enriched_count += 1
 
+                if on_progress and (idx % 5 == 0 or idx == len(normalized_commits)):
+                    pct = 45 + int(50 * idx / max(1, len(normalized_commits)))
+                    on_progress("enrichment", f"Enriching commits with authentic stats ({idx}/{len(normalized_commits)})...", pct)
+
                 if verbose and idx % 10 == 0:
                     _log(f"    [{idx}/{len(normalized_commits)}] Enriched {sha_short}")
 
@@ -735,9 +776,11 @@ def analyze_repository(
         manifest["counts"]["authentic_records"] = enriched_count
         manifest["counts"]["synthetic_records"] = 0
 
-        status = "truncated" if has_more else "complete"
+        status = "truncated" if (has_more or not manifest["completeness"]["is_complete"]) else "complete"
         _write_manifest(status)
         _log(f"✓ Ingestion {status.upper()}. Manifest saved to {path_manifest}")
+        if on_progress:
+            on_progress("complete", f"Ingestion {status.upper()} ({enriched_count} commits ready)", 100)
         return manifest
 
     except Exception as exc:

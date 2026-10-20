@@ -1,0 +1,40 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "psf_requests",
+  "repository": "psf/requests",
+  "repository_url": "https://github.com/psf/requests",
+  "started_at": "2026-10-20T13:14:29.491019+00:00",
+  "completed_at": "2026-10-20T13:14:35.076582+00:00",
+  "duration_seconds": 5.59,
+  "status": "truncated",
+  "commit_limit": 10,
+  "completeness": {
+    "is_complete": false,
+    "truncated_by_limit": true,
+    "has_more_commits": true,
+    "total_commits_fetched": 10
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 10,
+    "enriched_commits": 10,
+    "authentic_records": 10,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 48,
+    "reset_timestamp": 1792505669
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [
+    "History truncated by commit limit (10). Repository contains additional commits."
+  ],
+  "errors": []
+}

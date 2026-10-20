@@ -137,16 +137,16 @@ Options:
 # hive -f hive/query_features.hql
 ```
 
-### 8. Web Dashboard (Interactive Visualization)
+### 8. Web Dashboard (Interactive Repository Analyzer & Cluster Explorer)
 
-Launch the locally runnable dashboard to visualize repository features, data provenance, and Spark MLlib clustering:
+Launch the locally runnable dashboard to analyze arbitrary GitHub repositories, explore single-repository temporal trends and author contributions, or inspect multi-repository MapReduce feature aggregations and Spark MLlib clustering:
 
 ```bash
 # Start server on default port 8050
 python3 dashboard/server.py
 
 # Or specify a custom port / host
-python3 dashboard/server.py --host 127.0.0.1 --port 8080
+python3 dashboard/server.py --host 127.0.0.1 --port 8050
 
 # Verify data files without launching the web server
 python3 dashboard/server.py --check-only
@@ -155,12 +155,24 @@ python3 dashboard/server.py --check-only
 Once running, navigate in any modern browser to:
 👉 **`http://127.0.0.1:8050/`**
 
-**Dashboard Features:**
-- **Pipeline Overview:** Displays live repository counts, total commits, enrichment breakdown (authentic vs synthetic), and cluster assignments.
-- **Prominent Provenance Banner:** Transparently flags that 985 of 1,000 commits are synthetic mock data, qualifying clustering results.
-- **Spark MLlib Cluster Explorer:** Neutral geometric cluster breakdown (Clusters 0–3) with interactive metric comparison bar chart (Additions, Deletions, Merge Ratio, Unique Authors).
-- **Interactive Repository Profiles Table:** Real-time search by repository name, filtering by Cluster and Language, multi-column sorting, and strict missing-data handling (displaying `N/A` rather than misleading zeroes).
-- **Offline & Standalone:** Powered by Python standard library `http.server`, vanilla HTML5, CSS3, and JavaScript — zero external web dependencies or GitHub tokens required.
+**Primary User Workflow — Analyze Any GitHub Repository:**
+1. **Repository Input:** Enter any public GitHub repository URL (e.g. `https://github.com/psf/requests`) or identifier (`psf/requests`). Full URLs, SSH paths (`git@github.com:...`), and plain slugs are supported.
+2. **History Coverage Modes:**
+   - **Recent Commits Limit:** Configurable recent commit fetch threshold (default 10 commits) to preserve rate limits.
+   - **All Available History:** Paginates through all accessible commits until repository history is exhausted or rate limits are reached. Truncated runs are explicitly flagged (`status: "truncated"`); truncated history is never mislabeled as complete.
+3. **Live Progress Tracking:** Asynchronous background execution displays live processing stages: validation, commit pagination, authentic diff enrichment, MapReduce aggregation, and commit-level K-Means clustering.
+4. **Single-Repository Analytics & Visualizations:**
+   - **Overview & Coverage Status:** Total commits analyzed, date range (earliest to latest commit dates, duration in days), code churn (+additions, -deletions, net lines changed), files touched, and merge ratios.
+   - **Temporal Activity & Code Churn:** Dynamic SVG time-series chart with Daily, Weekly, and Monthly aggregations showing commit frequency and line additions/deletions churn.
+   - **Author Contributions & Attribution Notice:** Tabular breakdown of author commit share, additions, deletions, merges, and active timeframes. Prominently displays the git identity attribution notice (aliases appear as distinct authors).
+   - **Commit-Level K-Means Clustering:** Standardizes 5 commit-level features (`[additions, deletions, lines_changed, files_changed, parent_count]`), computes the standard squared Euclidean silhouette score in $[-1.0, 1.0]$, and groups commits into descriptive behavioral profiles. Gracefully skips clustering with an explicit mathematical notice when observations are insufficient ($< 3$ commits or zero feature variance).
+   - **Frequently Changed Files:** Identifies top touched files across analyzed commits.
+   - **Commit Records Explorer:** Client-side filterable table with real-time text search, author filter, cluster filter, merge filter, and sorting. Missing GitHub statistics are preserved as `N/A` and never silently zeroed.
+   - **Data Exports:** One-click downloads for commit records (`commits_<run_id>.csv`) and complete run payloads (`analysis_<run_id>.json`).
+5. **Multi-Repository View Preservation:**
+   - Switch between dynamic live runs and baseline demonstration data using the run selector dropdown.
+   - Multi-repository runs automatically activate the multi-repository view: Spark MLlib K-Means cluster cards, normalized feature comparison chart, and repository profile tables.
+   - Previous runs and baseline datasets remain intact and isolated in `data/runs/` and `data/sample/`.
 
 ### 9. Tests
 
@@ -168,7 +180,7 @@ Once running, navigate in any modern browser to:
 python3 -m pytest tests/ -v
 ```
 
-### 10. Dynamic Repository Ingestion (Authentic Data)
+### 10. Dynamic Repository Ingestion (Single Repository)
 
 To ingest and analyze any public GitHub repository with 100% authentic data (saving to an isolated run directory without touching sample data):
 
@@ -184,7 +196,7 @@ python3 -m ingestion.analyze_repository --max-commits 25 --output-dir data/runs/
 ```
 
 **Environment & Rate-Limit Configuration:**
-- **Unauthenticated mode:** Operates without credentials for public repositories (GitHub rate limit: 60 requests/hour).
+- **Unauthenticated mode:** Operates without credentials for public repositories (GitHub rate limit: 60 requests/hour). When rate limits fall below 2 requests, per-commit enrichment pauses safely to protect the remaining quota.
 - **Authenticated mode:** Set `GITHUB_TOKEN` to increase your rate limit to 5,000 requests/hour:
   ```bash
   export GITHUB_TOKEN=ghp_your_token_here
@@ -205,9 +217,43 @@ Each run outputs to an isolated directory (e.g. `data/runs/<repo>-<timestamp>-<r
 - `status: "truncated"` / `is_complete: false`: Ingestion stopped at the configured commit limit.
 - `status: "empty"`: Repository contains 0 commits.
 
+### 11. Multi-Repository Analysis Pipeline (End-to-End Orchestration)
+
+To ingest multiple repositories, aggregate features via MapReduce, and cluster with Spark MLlib in a single isolated run:
+
+```bash
+# End-to-end multi-repository run:
+python3 scripts/run_pipeline.py psf/requests pallets/flask pallets/click encode/httpx \
+  --output-dir data/runs/my_analysis \
+  --max-commits 10 \
+  --clusters 2 \
+  --seed 42
+```
+
+**Pipeline Safeguards & Guarantees:**
+- **Directory Isolation:** Requires a fresh output directory inside `data/runs/` (or auto-generates one). Never touches `data/sample/` or `data/output/`.
+- **Clustering Threshold:** Single-repository runs execute ingestion and MapReduce feature extraction, but automatically skip Spark K-Means with an explanatory diagnostic manifest (clustering $N=1$ is mathematically degenerate). Multi-repository runs require $N \ge 2$ and automatically cap $k \le N$.
+- **Quota Preservation:** Reuses pre-staged authentic repository data if already present in the target directory to avoid re-requesting existing commits.
+
+### 12. Model Features vs. Descriptive Metadata
+
+The pipeline strictly separates features used in unsupervised clustering from descriptive repository metadata:
+
+| Field Name | Category | Used in Spark MLlib K-Means? | Notes |
+|------------|----------|------------------------------|-------|
+| `commit_count` | **Model Feature** | Yes (Standardized) | Sampled commits in the analysis window |
+| `avg_additions` | **Model Feature** | Yes (Standardized) | Mean lines added per commit |
+| `avg_deletions` | **Model Feature** | Yes (Standardized) | Mean lines removed per commit |
+| `avg_lines_changed` | **Model Feature** | Yes (Standardized) | Mean total lines changed (`additions + deletions`) |
+| `avg_files_changed` | **Model Feature** | Yes (Standardized) | Mean files touched per commit |
+| `merge_ratio` | **Model Feature** | Yes (Standardized) | Fraction of merge commits (`parent_count > 1`) |
+| `language` | *Descriptive Metadata* | No | Informational context only |
+| `stars` / `forks` | *Descriptive Metadata* | No | Popularity metrics, not clustering inputs |
+| `distinct_authors` | *Descriptive Metadata* | No | Contributor count in window |
+
 **Provenance Distinction:**
-- `data/sample/`: Baseline 20-repo demonstration dataset (985 synthetic, 15 authentic). Strictly protected from overwrite.
-- `data/runs/`: Isolated dynamic runs containing 100% authentic, verified GitHub API data.
+- `data/sample/`: Baseline 20-repo demonstration dataset (985 synthetic, 15 authentic). Strictly protected from overwrite. Mock records have `synthetic: true`.
+- `data/runs/`: Isolated dynamic runs containing 100% authentic, verified GitHub API data (`synthetic: false`).
 
 ---
 
@@ -290,6 +336,66 @@ All repo_features fields plus:
 
 ---
 
+## Clustering Methodology & Metric Interpretation
+
+1. **Distance Metric:** Spark MLlib's `ClusteringEvaluator` is configured with `distanceMeasure="squaredEuclidean"`. The silhouette score is bounded in $[-1.0, 1.0]$. Positive values indicate that repositories are closer to their assigned cluster center than to neighboring cluster centers.
+2. **Label Nature:** Cluster identifiers (`0`, `1`, `2`, ...) are arbitrary categorical group labels determined by unsupervised K-Means in standardized feature space.
+3. **No Quality or Productivity Ranking:** Cluster assignments describe geometric proximity across commit size and merge frequency features. They must **never** be interpreted as rankings of code quality, developer productivity, or project health.
+4. **Sampling Horizon Caveat:** Dynamic analyses operate over a recent-history sampling window (e.g. 10–50 recent commits). Commit statistics represent recent repository churn rather than longitudinal project lifecycle behavior.
+
+---
+
+## Phase 8 Bounded Experimental Validation
+
+An authentic, multi-repository experimental cohort was analyzed using the end-to-end pipeline:
+
+### Cohort Composition (8 Repositories, 80 Commits)
+- `psf/requests` (HTTP client library)
+- `pallets/flask` (WSGI web framework)
+- `pallets/click` (CLI composition toolkit)
+- `encode/httpx` (Async/sync HTTP client)
+- `pydantic/pydantic` (Data validation and parsing)
+- `tiangolo/fastapi` (Async web framework)
+- `urllib3/urllib3` (Low-level HTTP library)
+- `tornadoweb/tornado` (Async networking framework)
+
+### Execution Command
+```bash
+python3 scripts/run_pipeline.py \
+  psf/requests pallets/flask pallets/click encode/httpx \
+  pydantic/pydantic tiangolo/fastapi urllib3/urllib3 tornadoweb/tornado \
+  --output-dir data/runs/analysis-cohort8-20261020T073500Z-8repos \
+  --max-commits 10 \
+  --clusters 3 \
+  --seed 42
+```
+
+### Measured Outcomes
+- **Record Provenance:** 8 repositories, 80 commits, 80 authentic enriched records, **0 synthetic records**.
+- **K-Means Configuration:** $k=3$, Seed = 42, Features = 6 standardized metrics.
+- **Silhouette Score:** **0.574** (distance measure: `squaredEuclidean`).
+
+### Clustering Stability Assessment (Adjusted Rand Index)
+To test algorithmic stability against random centroid initialization, the clustering was re-run on the identical standardized feature vectors across four distinct random seeds: `[42, 100, 2026, 777]`:
+
+| Repository | Seed 42 | Seed 100 | Seed 2026 | Seed 777 | Profile Summary |
+|------------|---------|----------|-----------|----------|-----------------|
+| `encode/httpx` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Low/Moderate churn (90 lines changed, merge ratio 0.0) |
+| `fastapi/fastapi` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Moderate churn (920 lines changed, merge ratio 0.0) |
+| `pallets/flask` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Moderate churn (1,120 lines changed, merge ratio 0.2) |
+| `psf/requests` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Low churn (40 lines changed, merge ratio 0.0) |
+| `pydantic/pydantic` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Moderate churn (1,174 lines changed, merge ratio 0.0) |
+| `urllib3/urllib3` | Cluster 0 | Cluster 0 | Cluster 0 | Cluster 0 | Moderate churn (723 lines changed, merge ratio 0.0) |
+| `tornadoweb/tornado` | Cluster 1 | Cluster 1 | Cluster 1 | Cluster 1 | High churn outlier (3,293 lines changed, merge ratio 0.3) |
+| `pallets/click` | Cluster 2 | Cluster 2 | Cluster 2 | Cluster 2 | High churn & high merge outlier (4,592 lines, merge ratio 0.5) |
+
+- **Silhouette (all seeds):** `0.5740`
+- **Pairwise Adjusted Rand Index (ARI):** `1.0000` for all seed pairs.
+- **Mean Pairwise ARI:** `1.0000`
+- **Methodological Takeaway:** The clustering assignment is completely stable across random initializations for this cohort. This stability is driven by distinct behavioral separation between the 6 low/moderate-churn repositories and the 2 high-churn/high-merge repositories in the recent 10-commit window.
+
+---
+
 ## Verification Results
 
 | Check | Result |
@@ -299,33 +405,34 @@ All repo_features fields plus:
 | `enriched_commits.jsonl` (mock) | ✅ 1000/1000 records (100%), marked `synthetic=True` |
 | `enriched_commits.jsonl` (live 15) | ✅ 15 real GitHub records preserved |
 | Dataset validation script | ✅ All core checks pass (PASS WITH WARNINGS: mock data noted) |
-| Automated Tests (145 tests) | ✅ 145 passed, 0 failures (Ingestion: 69, MapReduce: 23, Spark: 7, Dashboard: 13, Dynamic Ingestion: 33) |
+| Automated Tests (178 tests) | ✅ 178 passed, 0 failures (Ingestion: 69, MapReduce: 23, Spark: 16, Dashboard: 19, Dynamic Ingestion: 33, Commit Clustering: 5, Pipeline: 13) |
 | MapReduce local simulation | ✅ 20 repos aggregated correctly into `repo_features_local.jsonl` |
 | MapReduce distributed (YARN/HDFS) | ✅ Hadoop Streaming job verified in Docker cluster (`repo_features_mr/`) |
-| Spark MLlib clustering | ✅ 20 repos clustered (k=4, silhouette score ~0.404) |
-| Web Dashboard (`dashboard/`) | ✅ HTTP server, API endpoints, and data contracts verified (13 tests); browser E2E unverified |
+| Spark MLlib clustering (Sample) | ✅ 20 repos clustered (k=4, silhouette score ~0.404) |
+| Spark MLlib clustering (Authentic Cohort) | ✅ 8 repos clustered (k=3, silhouette 0.574, mean pairwise ARI 1.0000) |
+| Web Dashboard (`dashboard/`) | ✅ HTTP server, live repository analysis API (`/api/analyze`), export API (`/api/export`), path traversal protection, single-repo views, and multi-repo views verified |
 
 ---
 
 ## Known Limitations
 
-1. **Dataset scope**: The sample contains at most 50 *recent* commits per repository, not complete histories. Cluster assignments reflect patterns within this narrow window, not overall repository characteristics.
+1. **Dataset scope**: Sample datasets and dynamic runs contain 10–50 *recent* commits per repository, not complete histories. Cluster assignments reflect patterns within this narrow window, not overall repository characteristics.
 
-2. **Synthetic enrichment**: Mock mode produces structurally correct but statistically fabricated data (deterministic from SHA, not from actual GitHub diff data). All mock records are labelled `synthetic=True`. Do not interpret mock-mode clusters as real commit statistics.
+2. **Synthetic enrichment in baseline sample**: The baseline sample dataset in `data/sample/` contains 985 mock-generated commit records (labelled `synthetic=True`). In contrast, runs in `data/runs/` contain 100% authentic GitHub diff data.
 
 3. **Author identity**: Commits are attributed by name string only. The same developer using different names/emails across repositories or machines will appear as distinct authors.
 
-4. **Sample selection**: The 20 repositories were selected by star count (GitHub search `stars>1000`). This heavily biases toward popular open-source projects and is not representative of typical repository behaviour.
+4. **Clustering distance metric**: Spark's `ClusteringEvaluator` uses squared Euclidean distance. Silhouette scores must not be compared directly against evaluations using standard Euclidean or cosine distance.
 
-5. **No target variable**: Clustering is unsupervised; clusters are groupings by feature proximity, not a validated quality signal. A silhouette score near 0 means clusters overlap significantly.
+5. **No target variable or ranking**: Clustering is unsupervised; clusters are groupings by feature proximity, not a validated quality signal. Cluster IDs are categorical, not ordinal rankings.
 
 6. **Java compatibility**: PySpark 4.x requires Java 17+. If your system only has Java 11, install `pyspark<4.0`.
 
 7. **Hive not verified**: Hive is not installed in the current local environment. The HQL files in `hive/` are provided for reference. They require a running HiveServer2 (available inside a suitable Docker image) and have not been executed or tested in this project.
 
-8. **Live GitHub API enrichment not verified end-to-end**: The `ingestion/enriched_commits.py --mock` path is fully working (985 synthetic + 15 authentic records preserved). Live mode (`--mock` omitted) requires a valid `GITHUB_TOKEN` environment variable with `repo` scope. Live enrichment was not re-executed; the 15 authentic records were collected in a prior session and preserved by the resumability mechanism.
+8. **GitHub API rate limits**: Unauthenticated requests are limited to 60/hour; authenticated requests allow 5,000/hour. Ingestion automatically pauses per-commit enrichment when headroom drops below 2 requests.
 
-9. **Browser-based JavaScript execution unverified**: While the dashboard backend server, routing, and data payloads are rigorously verified via unit/integration tests (`tests/test_dashboard.py`) and CLI validation, automated end-to-end browser execution (e.g., via Playwright or headless Chrome) was not performed due to local headless browser dependencies. Interactive UI features (DOM rendering, SVG charting, sorting, filtering) are designed using vanilla JavaScript and require visual verification in a standard browser.
+9. **Browser-based JavaScript visual execution unverified**: While the dashboard backend server, routing, and data payloads are rigorously verified via unit/integration tests and HTTP requests, automated headless browser execution (Playwright) could not run due to an upstream driver CDN packaging issue. The dashboard is verified via HTTP API tests and can be visually inspected in any standard web browser.
 
 ---
 
@@ -344,10 +451,14 @@ git-commit-pattern/
 │   │   ├── commits.jsonl
 │   │   ├── enriched_commits.jsonl
 │   │   └── enrichment_errors.jsonl   # failure log
-│   └── output/
-│       ├── repo_features_local.jsonl # MapReduce local output
-│       ├── repo_features_mr/         # Hadoop Streaming HDFS output
-│       └── repo_clusters.json        # Spark MLlib clustering output
+│   ├── output/
+│   │   ├── repo_features_local.jsonl # MapReduce local output
+│   │   ├── repo_features_mr/         # Hadoop Streaming HDFS output
+│   │   └── repo_clusters.json        # Spark MLlib clustering output
+│   └── runs/                         # Isolated dynamic analysis runs
+│       ├── analysis-cohort8-20261020T073500Z-8repos/
+│       ├── analysis-20261020T064812Z-04c4400f/
+│       └── ...
 ├── ingestion/
 │   ├── config.py
 │   ├── discover_repos.py
@@ -358,20 +469,22 @@ git-commit-pattern/
 │   ├── mapper.py
 │   └── reducer.py
 ├── spark/
-│   └── cluster_repos.py
+│   └── cluster_repos.py          # PySpark K-Means clustering & evaluation
 ├── hive/
 │   ├── create_tables.hql
 │   └── query_features.hql
 ├── scripts/
-│   ├── validate_data.py
+│   ├── validate_data.py          # Dataset schema and integrity validator
+│   ├── run_pipeline.py           # Multi-repository pipeline orchestrator
 │   ├── upload_to_hdfs.sh
 │   └── run_mapreduce.sh
 ├── tests/
 │   ├── test_ingestion.py         # 69 tests
 │   ├── test_mapreduce.py         # 23 tests
-│   ├── test_spark.py             # 7 tests
+│   ├── test_spark.py             # 16 tests
 │   ├── test_dashboard.py         # 13 tests
-│   └── test_analyze_repository.py # 33 tests
+│   ├── test_analyze_repository.py # 33 tests
+│   └── test_pipeline.py          # 13 tests
 ├── docker-compose.yml
 └── requirements.txt
 ```
