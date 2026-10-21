@@ -1,0 +1,84 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T072336Z-d974b3c0",
+  "repository": "abhiMahata/GitMortuary",
+  "repository_url": "https://github.com/abhiMahata/GitMortuary",
+  "started_at": "2026-10-21T07:23:36.460897+00:00",
+  "completed_at": "2026-10-21T07:23:47.532620+00:00",
+  "duration_seconds": 11.07,
+  "status": "complete",
+  "history_mode": "full_history",
+  "commit_limit": null,
+  "requested_limit": "all",
+  "date_range": {
+    "earliest": "2026-09-16T18:23:41Z",
+    "latest": "2026-10-21T05:23:26Z"
+  },
+  "completeness": {
+    "is_complete": true,
+    "truncated_by_limit": false,
+    "has_more_commits": false,
+    "total_commits_fetched": 24
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 24,
+    "enriched_commits": 24,
+    "authentic_records": 24,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 33,
+    "reset_timestamp": 1792571016
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [],
+  "errors": [],
+  "analysis_id": "analysis-20261021T072336Z-d974b3c0",
+  "type": "orchestrated_analysis",
+  "repositories_requested": [
+    "abhiMahata/GitMortuary"
+  ],
+  "stages": {
+    "ingestion": {
+      "status": "complete",
+      "repositories_attempted": 1,
+      "repositories_succeeded": 1,
+      "repositories_failed": 0,
+      "runs": [
+        {
+          "repository": "abhiMahata/GitMortuary",
+          "status": "complete",
+          "commits": 24,
+          "enriched": 24,
+          "directory": "repositories/abhiMahata_GitMortuary"
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "success",
+      "mode": "local_streaming",
+      "features_count": 1,
+      "output_file": "repo_features.jsonl"
+    },
+    "spark": {
+      "status": "success",
+      "reason": "",
+      "k": 3,
+      "seed": 42,
+      "silhouette": -0.4211,
+      "silhouette_status": "valid",
+      "silhouette_reason": "Standard squared Euclidean silhouette in range [-1.0, 1.0].",
+      "distance_measure": "squaredEuclidean",
+      "target": "commit_level_clustering",
+      "output_file": "commit_clusters.json"
+    }
+  }
+}

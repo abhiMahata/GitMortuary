@@ -1,17 +1,23 @@
 /**
  * Git Pattern Analysis — Interactive Dashboard Logic
- * Zero-dependency pure JavaScript client for live GitHub repository analysis,
- * temporal trends, author contributions, and distributed clustering exploration.
+ * Graphite & Signal Colours Architecture
+ *
+ * Provides intentional landing experience, real-time repository pipeline analysis,
+ * temporal activity tracking, line churn dynamics, author attribution,
+ * commit-level K-Means, and multi-repository Spark clustering.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Application State
   let dashboardData = null;
-  let activeRunId = "sample";
+  let activeRunId = null; // null on initial load — intentional landing page!
+  let currentView = "landing"; // 'landing' | 'progress' | 'results'
+  let runsList = [];
 
-  // Granularity for single-repo time-series chart: 'daily' | 'weekly' | 'monthly'
+  // Single-repo time-series granularity: 'daily' | 'weekly' | 'monthly'
   let activeGranularity = "daily";
 
-  // Single-repo commit filters
+  // Single-repo commit filters & sorting
   let commitSearchQuery = "";
   let commitAuthorFilter = "all";
   let commitClusterFilter = "all";
@@ -19,48 +25,124 @@ document.addEventListener("DOMContentLoaded", () => {
   let commitSortColumn = "date";
   let commitSortDirection = "desc";
 
-  // Multi-repo filters
+  // Multi-repo filters & sorting
   let activeClusterFilter = "all";
   let activeLanguageFilter = "all";
   let activeSearchQuery = "";
   let sortColumn = "repo_name";
   let sortDirection = "asc";
 
+  // Restrained Signal Cluster Palette
   const CLUSTER_COLORS = {
-    0: "#06b6d4", // Cyan
-    1: "#10b981", // Emerald
-    2: "#f59e0b", // Amber
-    3: "#8b5cf6", // Violet
+    0: "#2563eb", // Signal Cobalt
+    1: "#10b981", // Signal Emerald
+    2: "#f59e0b", // Signal Amber
+    3: "#8b5cf6", // Signal Violet
   };
 
-  // DOM Elements - Global
+  // =========================================================================
+  // DOM ELEMENT REFERENCES
+  // =========================================================================
+
+  // Navigation & Global Header
+  const elBrandLink = document.getElementById("brand-link");
+  const elNavBtnNewAnalysis = document.getElementById("nav-btn-new-analysis");
   const elSelectActiveRun = document.getElementById("select-active-run");
-  const elBtnRefresh = document.getElementById("btn-refresh");
+  const elOptgroupRuns = document.getElementById("optgroup-runs");
   const elStatusPill = document.getElementById("pipeline-status-pill");
   const elStatusText = document.getElementById("status-text");
+  const elBtnRefresh = document.getElementById("btn-refresh");
 
-  // DOM Elements - Analysis Form
+  // Top-Level Views
+  const elLandingView = document.getElementById("landing-view");
+  const elProgressView = document.getElementById("progress-view");
+  const elResultsView = document.getElementById("results-view");
+
+  // View 1: Landing Page Elements
   const elFormAnalyze = document.getElementById("form-analyze-repo");
   const elInputRepoUrl = document.getElementById("input-repo-url");
   const elRadioModeLimit = document.getElementById("radio-mode-limit");
   const elRadioModeFull = document.getElementById("radio-mode-full");
   const elInputCommitLimit = document.getElementById("input-commit-limit");
   const elLimitContainer = document.getElementById("limit-input-container");
+  const elCheckUseHadoop = document.getElementById("check-use-hadoop");
   const elBtnStartAnalysis = document.getElementById("btn-start-analysis");
   const elBtnAnalyzeText = document.getElementById("btn-analyze-text");
-  const elAnalysisProgressBox = document.getElementById("analysis-progress-box");
+  const elPreviousRunsContainer = document.getElementById("previous-runs-container");
+  const elPreviousRunsEmptyState = document.getElementById("previous-runs-empty-state");
+  const elPreviousRunsCountBadge = document.getElementById("previous-runs-count-badge");
+  const elBtnLoadDemoSample = document.getElementById("btn-load-demo-sample");
+
+  // View 2: Progress Elements
+  const elProgressRepoTarget = document.getElementById("progress-repo-target");
+  const elProgressRepoUrl = document.getElementById("progress-repo-url");
+  const elBtnCancelProgress = document.getElementById("btn-cancel-progress");
   const elProgressStageTitle = document.getElementById("progress-stage-title");
   const elProgressStageMsg = document.getElementById("progress-stage-msg");
   const elProgressPercentVal = document.getElementById("progress-percent-val");
   const elProgressBarFill = document.getElementById("progress-bar-fill");
   const elAnalysisErrorBox = document.getElementById("analysis-error-box");
   const elAnalysisErrorMsg = document.getElementById("analysis-error-msg");
+  const elBtnRetryAnalysis = document.getElementById("btn-retry-analysis");
 
-  // DOM Elements - View Containers
+  // View 3: Results Experience Elements
+  const elBtnBackToLanding = document.getElementById("btn-back-to-landing");
+  const elActiveRunIdLabel = document.getElementById("active-run-id-label");
+  const elActiveRunTypeBadge = document.getElementById("active-run-type-badge");
+  const elBtnExportCsv = document.getElementById("btn-export-csv");
+  const elBtnExportJson = document.getElementById("btn-export-json");
+  const elRunStatusAlert = document.getElementById("run-status-alert");
+  const elProvenanceBanner = document.getElementById("provenance-banner");
+  const elProvenanceNoticeText = document.getElementById("provenance-notice-text");
+
+  // View 3 Sub-containers
   const elSingleRepoContainer = document.getElementById("single-repo-view-container");
   const elMultiRepoContainer = document.getElementById("multi-repo-view-container");
 
-  // DOM Elements - Multi-Repo
+  // Single-Repo View Elements
+  const elSingleRepoName = document.getElementById("single-repo-name");
+  const elSingleGithubLink = document.getElementById("single-repo-github-link");
+  const elSingleLang = document.getElementById("single-repo-lang");
+  const elSingleStars = document.getElementById("single-repo-stars");
+  const elSingleForks = document.getElementById("single-repo-forks");
+  const elSingleDataBadge = document.getElementById("single-repo-data-badge");
+  const elSingleCoverageBadge = document.getElementById("single-repo-coverage-badge");
+  const elSingleStatCommits = document.getElementById("single-stat-commits");
+  const elSingleStatHistoryMode = document.getElementById("single-stat-history-mode");
+  const elSingleStatDateRange = document.getElementById("single-stat-daterange");
+  const elSingleStatDuration = document.getElementById("single-stat-duration");
+  const elSingleStatChurn = document.getElementById("single-stat-churn");
+  const elSingleStatAdd = document.getElementById("single-stat-add");
+  const elSingleStatDel = document.getElementById("single-stat-del");
+  const elSingleStatLines = document.getElementById("single-stat-lines");
+  const elSingleStatFilesMerges = document.getElementById("single-stat-files-merges");
+  const elSingleStatMergeRatio = document.getElementById("single-stat-merge-ratio");
+  const elSingleStatAuthors = document.getElementById("single-stat-authors");
+  const elSingleMissingStatsAlert = document.getElementById("single-repo-missing-stats-alert");
+  const elValMissingStatsCount = document.getElementById("val-missing-stats-count");
+
+  // Granularity buttons & single-repo SVG
+  const elBtnDaily = document.getElementById("btn-granularity-daily");
+  const elBtnWeekly = document.getElementById("btn-granularity-weekly");
+  const elBtnMonthly = document.getElementById("btn-granularity-monthly");
+  const elSingleTimeseriesSvg = document.getElementById("single-repo-timeseries-svg");
+
+  // Single-repo Authors & Files
+  const elSingleAuthorTableBody = document.getElementById("single-author-table-body");
+  const elValCommitSilhouette = document.getElementById("val-commit-silhouette");
+  const elCommitClusteringNotice = document.getElementById("commit-clustering-notice");
+  const elCommitClusterCards = document.getElementById("commit-cluster-cards-container");
+  const elSingleFilesTableBody = document.getElementById("single-files-table-body");
+
+  // Single-repo Commits Explorer
+  const elInputCommitSearch = document.getElementById("input-commit-search");
+  const elSelectCommitAuthor = document.getElementById("select-commit-author-filter");
+  const elSelectCommitCluster = document.getElementById("select-commit-cluster-filter");
+  const elSelectCommitMerge = document.getElementById("select-commit-merge-filter");
+  const elBtnResetCommitFilters = document.getElementById("btn-reset-commit-filters");
+  const elCommitsDetailTableBody = document.getElementById("commits-detail-table-body");
+
+  // Multi-Repo Elements
   const elValRepos = document.getElementById("val-repos");
   const elValCommits = document.getElementById("val-commits");
   const elValEnriched = document.getElementById("val-enriched");
@@ -75,59 +157,151 @@ document.addEventListener("DOMContentLoaded", () => {
   const elBtnReset = document.getElementById("btn-reset-filters");
   const elFlowContainer = document.getElementById("pipeline-flow-container");
 
-  // DOM Elements - Single-Repo
-  const elSingleRepoName = document.getElementById("single-repo-name");
-  const elSingleGithubLink = document.getElementById("single-repo-github-link");
-  const elSingleLang = document.getElementById("single-repo-lang");
-  const elSingleStars = document.getElementById("single-repo-stars");
-  const elSingleForks = document.getElementById("single-repo-forks");
-  const elSingleCoverageBadge = document.getElementById("single-repo-coverage-badge");
-  const elSingleStatCommits = document.getElementById("single-stat-commits");
-  const elSingleStatHistoryMode = document.getElementById("single-stat-history-mode");
-  const elSingleStatDateRange = document.getElementById("single-stat-daterange");
-  const elSingleStatDuration = document.getElementById("single-stat-duration");
-  const elSingleStatAdd = document.getElementById("single-stat-add");
-  const elSingleStatDel = document.getElementById("single-stat-del");
-  const elSingleStatLines = document.getElementById("single-stat-lines");
-  const elSingleStatFilesMerges = document.getElementById("single-stat-files-merges");
-  const elSingleStatMergeRatio = document.getElementById("single-stat-merge-ratio");
-  const elSingleStatAuthors = document.getElementById("single-stat-authors");
-  const elSingleMissingStatsAlert = document.getElementById("single-repo-missing-stats-alert");
-  const elValMissingStatsCount = document.getElementById("val-missing-stats-count");
+  // =========================================================================
+  // 1. VIEW ROUTER & NAVIGATION
+  // =========================================================================
 
-  // Granularity buttons
-  const elBtnDaily = document.getElementById("btn-granularity-daily");
-  const elBtnWeekly = document.getElementById("btn-granularity-weekly");
-  const elBtnMonthly = document.getElementById("btn-granularity-monthly");
-  const elSingleTimeseriesSvg = document.getElementById("single-repo-timeseries-svg");
+  function showView(viewName) {
+    currentView = viewName;
 
-  // Single-repo Authors
-  const elSingleAuthorTableBody = document.getElementById("single-author-table-body");
+    if (elLandingView) elLandingView.style.display = viewName === "landing" ? "block" : "none";
+    if (elProgressView) elProgressView.style.display = viewName === "progress" ? "block" : "none";
+    if (elResultsView) elResultsView.style.display = viewName === "results" ? "block" : "none";
 
-  // Single-repo Clustering
-  const elValCommitSilhouette = document.getElementById("val-commit-silhouette");
-  const elCommitClusteringNotice = document.getElementById("commit-clustering-notice");
-  const elCommitClusterCards = document.getElementById("commit-cluster-cards-container");
+    // Update header active state
+    if (elNavBtnNewAnalysis) {
+      if (viewName === "landing") {
+        elNavBtnNewAnalysis.classList.add("active");
+      } else {
+        elNavBtnNewAnalysis.classList.remove("active");
+      }
+    }
 
-  // Single-repo Files
-  const elSingleFilesTableBody = document.getElementById("single-files-table-body");
+    // Update status indicator in header
+    if (elStatusText) {
+      if (viewName === "landing") {
+        elStatusText.textContent = "Ready";
+      } else if (viewName === "progress") {
+        elStatusText.textContent = "Analyzing…";
+      } else if (viewName === "results") {
+        elStatusText.textContent = activeRunId === "sample" ? "Demonstration Sample" : `Run: ${activeRunId || "Active"}`;
+      }
+    }
+  }
 
-  // Single-repo Commits Explorer
-  const elInputCommitSearch = document.getElementById("input-commit-search");
-  const elSelectCommitAuthor = document.getElementById("select-commit-author-filter");
-  const elSelectCommitCluster = document.getElementById("select-commit-cluster-filter");
-  const elSelectCommitMerge = document.getElementById("select-commit-merge-filter");
-  const elBtnResetCommitFilters = document.getElementById("btn-reset-commit-filters");
-  const elCommitsDetailTableBody = document.getElementById("commits-detail-table-body");
+  function returnToLanding() {
+    activeRunId = null;
+    if (elSelectActiveRun) elSelectActiveRun.value = "";
+    showView("landing");
+  }
 
-  // Export buttons
-  const elBtnExportCommitsCsv = document.getElementById("btn-export-commits-csv");
-  const elBtnExportRepoJson = document.getElementById("btn-export-repo-json");
-  const elBtnExportMultiCsv = document.getElementById("btn-export-multi-csv");
-  const elBtnExportMultiJson = document.getElementById("btn-export-multi-json");
+  async function loadRunAndDisplay(runId) {
+    activeRunId = runId;
+    if (elSelectActiveRun) elSelectActiveRun.value = runId;
+    showView("results");
+    await loadData(runId);
+  }
 
   // =========================================================================
-  // 1. ANALYSIS SUBMISSION & PROGRESS POLLING
+  // 2. RUN HISTORY & PREVIOUS RUNS
+  // =========================================================================
+
+  async function loadRuns() {
+    try {
+      const response = await fetch("/api/runs");
+      if (!response.ok) return;
+      const json = await response.json();
+      runsList = json.runs || [];
+
+      // Filter genuine user/completed runs (exclude baseline sample mock dataset)
+      const realRuns = runsList.filter(r => !r.is_sample);
+
+      // Populate Run History dropdown (<optgroup id="optgroup-runs">)
+      if (elOptgroupRuns) {
+        elOptgroupRuns.innerHTML = realRuns.map(r => {
+          return `<option value="${escapeHtml(r.run_id)}">${escapeHtml(r.label)}</option>`;
+        }).join("");
+      }
+
+      // Synchronize dropdown value
+      if (elSelectActiveRun) {
+        elSelectActiveRun.value = activeRunId || "";
+      }
+
+      // Render Previous Runs section on the Landing Page
+      renderPreviousRunsList(realRuns);
+    } catch (err) {
+      console.warn("Could not load runs list:", err);
+    }
+  }
+
+  function renderPreviousRunsList(realRuns) {
+    if (!elPreviousRunsContainer) return;
+
+    if (elPreviousRunsCountBadge) {
+      elPreviousRunsCountBadge.textContent = `${realRuns.length} Available`;
+    }
+
+    if (!realRuns || realRuns.length === 0) {
+      if (elPreviousRunsEmptyState) {
+        elPreviousRunsEmptyState.style.display = "block";
+        elPreviousRunsContainer.innerHTML = "";
+        elPreviousRunsContainer.appendChild(elPreviousRunsEmptyState);
+      }
+      return;
+    }
+
+    if (elPreviousRunsEmptyState) {
+      elPreviousRunsEmptyState.style.display = "none";
+    }
+
+    elPreviousRunsContainer.innerHTML = realRuns.map(r => {
+      const repoStr = (r.repositories && r.repositories.length) ? r.repositories.join(", ") : (r.label || r.run_id);
+      const commitsStr = `${r.commit_count || 0} commit${r.commit_count === 1 ? '' : 's'}`;
+      const tsStr = r.timestamp ? formatTimestamp(r.timestamp) : '--';
+
+      let statusBadge = '<span class="badge-solid-green">Complete</span>';
+      if (r.status === "failed") {
+        statusBadge = '<span class="badge-solid-red">Failed</span>';
+      } else if (r.status === "truncated") {
+        statusBadge = '<span class="badge-solid-amber">Truncated</span>';
+      }
+
+      return `
+        <div class="previous-run-card" data-run-id="${escapeHtml(r.run_id)}">
+          <div class="run-card-info">
+            <div class="run-card-title">
+              <span>${escapeHtml(repoStr)}</span>
+              ${statusBadge}
+            </div>
+            <div class="run-card-meta">
+              <span><strong>Run ID:</strong> <code>${escapeHtml(r.run_id)}</code></span>
+              <span><strong>Scope:</strong> ${commitsStr}</span>
+              <span><strong>Created:</strong> ${escapeHtml(tsStr)}</span>
+            </div>
+          </div>
+          <div class="run-card-actions">
+            <button type="button" class="btn-primary-signal btn-inspect-run" data-run-id="${escapeHtml(r.run_id)}" style="padding: 6px 12px; font-size: 0.8125rem;">
+              Inspect Analysis →
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    // Wire click events on each run card button
+    elPreviousRunsContainer.querySelectorAll(".btn-inspect-run").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const targetRunId = btn.getAttribute("data-run-id");
+        if (targetRunId) {
+          loadRunAndDisplay(targetRunId);
+        }
+      });
+    });
+  }
+
+  // =========================================================================
+  // 3. ANALYSIS SUBMISSION & PROGRESS POLLING
   // =========================================================================
 
   // Handle radio toggle
@@ -152,11 +326,11 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       const rawInput = (elInputRepoUrl.value || "").trim();
       if (!rawInput) {
-        showAnalysisError("Please enter a GitHub repository URL or owner/repository identifier.");
+        alert("Please enter a GitHub repository URL or owner/repository identifier.");
+        if (elInputRepoUrl) elInputRepoUrl.focus();
         return;
       }
 
-      hideAnalysisError();
       const mode = elRadioModeFull && elRadioModeFull.checked ? "full_history" : "recent_limit";
       let limit = 10;
       if (mode === "recent_limit") {
@@ -165,9 +339,14 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         limit = null;
       }
+      const useHadoop = elCheckUseHadoop && elCheckUseHadoop.checked;
 
-      // UI state: in progress
-      setAnalysisBusy(true, "Validating…", "Validating repository and checking GitHub API accessibility…", 10);
+      // Transition immediately to View 2: Progress
+      showView("progress");
+      if (elProgressRepoTarget) elProgressRepoTarget.textContent = `Analyzing ${rawInput}`;
+      if (elProgressRepoUrl) elProgressRepoUrl.textContent = `Target: ${rawInput} (${mode === "full_history" ? "All History" : `Limit: ${limit}`})`;
+      if (elAnalysisErrorBox) elAnalysisErrorBox.style.display = "none";
+      updateProgressDisplay("Ingestion Starting", "Initiating GitHub repository metadata retrieval and commit pagination…", 15);
 
       try {
         const resp = await fetch("/api/analyze", {
@@ -177,6 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
             repository: rawInput,
             mode: mode,
             limit: limit,
+            use_hadoop: useHadoop,
           }),
         });
 
@@ -186,25 +366,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const runId = result.run_id;
-        // Start polling progress
         pollAnalysisTask(runId);
       } catch (err) {
-        setAnalysisBusy(false);
         showAnalysisError(err.message);
       }
     });
-  }
-
-  function setAnalysisBusy(busy, stageText = "Processing…", msgText = "Please wait…", percent = 10) {
-    if (busy) {
-      if (elBtnStartAnalysis) elBtnStartAnalysis.disabled = true;
-      if (elBtnAnalyzeText) elBtnAnalyzeText.textContent = "Analyzing…";
-      if (elAnalysisProgressBox) elAnalysisProgressBox.style.display = "block";
-      updateProgressDisplay(stageText, msgText, percent);
-    } else {
-      if (elBtnStartAnalysis) elBtnStartAnalysis.disabled = false;
-      if (elBtnAnalyzeText) elBtnAnalyzeText.textContent = "Analyze Repository";
-    }
   }
 
   function updateProgressDisplay(stage, msg, percent) {
@@ -221,19 +387,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function hideAnalysisError() {
-    if (elAnalysisErrorBox) {
-      elAnalysisErrorBox.style.display = "none";
-    }
-  }
-
   function pollAnalysisTask(runId) {
     let pollInterval = setInterval(async () => {
       try {
         const resp = await fetch(`/api/analyze/status?run_id=${encodeURIComponent(runId)}`);
         if (!resp.ok) {
           clearInterval(pollInterval);
-          setAnalysisBusy(false);
           showAnalysisError(`Error polling task status: HTTP ${resp.status}`);
           return;
         }
@@ -249,46 +408,23 @@ document.addEventListener("DOMContentLoaded", () => {
           clearInterval(pollInterval);
           updateProgressDisplay("Complete", "Analysis successfully completed! Loading view…", 100);
           setTimeout(async () => {
-            setAnalysisBusy(false);
-            if (elAnalysisProgressBox) elAnalysisProgressBox.style.display = "none";
             await loadRuns();
-            await loadData(runId);
-          }, 600);
+            await loadRunAndDisplay(runId);
+          }, 500);
         } else if (task.status === "failed") {
           clearInterval(pollInterval);
-          setAnalysisBusy(false);
-          if (elAnalysisProgressBox) elAnalysisProgressBox.style.display = "none";
           showAnalysisError(task.error || task.message || "Analysis failed.");
         }
       } catch (err) {
         clearInterval(pollInterval);
-        setAnalysisBusy(false);
         showAnalysisError(`Polling connection error: ${err.message}`);
       }
-    }, 800);
+    }, 700);
   }
 
   // =========================================================================
-  // 2. RUN SELECTION & DATA LOADING
+  // 4. DATA LOADING & RESULTS VIEW ORCHESTRATION
   // =========================================================================
-
-  async function loadRuns() {
-    try {
-      const response = await fetch("/api/runs");
-      if (!response.ok) return;
-      const json = await response.json();
-      const runs = json.runs || [];
-      if (!elSelectActiveRun) return;
-
-      elSelectActiveRun.innerHTML = runs.map(r => {
-        return `<option value="${escapeHtml(r.run_id)}">${escapeHtml(r.label)}</option>`;
-      }).join("");
-
-      elSelectActiveRun.value = activeRunId || "sample";
-    } catch (err) {
-      console.warn("Could not load runs list:", err);
-    }
-  }
 
   async function loadData(runId = null) {
     if (runId !== null) {
@@ -298,10 +434,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       if (elTableBody) {
-        elTableBody.innerHTML = `<tr><td colspan="11" class="empty-state">Loading data from pipeline artifacts…</td></tr>`;
+        elTableBody.innerHTML = `<tr><td colspan="11" class="empty-state-cell">Loading data from pipeline artifacts…</td></tr>`;
       }
       if (elCommitsDetailTableBody) {
-        elCommitsDetailTableBody.innerHTML = `<tr><td colspan="10" class="empty-state">Loading commit records…</td></tr>`;
+        elCommitsDetailTableBody.innerHTML = `<tr><td colspan="10" class="empty-state-cell">Loading commit records…</td></tr>`;
       }
 
       const url = currentRun === "sample" ? "/api/data" : `/api/data?run=${encodeURIComponent(currentRun)}`;
@@ -315,8 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Failed to load dashboard data:", err);
       const errHtml = `
         <tr>
-          <td colspan="11" class="empty-state" style="color: var(--accent-rose);">
-            <div class="empty-state-icon">⚠️</div>
+          <td colspan="11" class="empty-state-cell" style="color: var(--signal-red);">
             <strong>Failed to load pipeline data:</strong> ${escapeHtml(err.message)}<br>
             <small style="color: var(--text-muted); margin-top: 6px; display: inline-block;">
               Ensure <code>dashboard/server.py</code> is running and artifacts exist for run <code>${escapeHtml(currentRun)}</code>.
@@ -330,35 +465,40 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderAll() {
     if (!dashboardData) return;
 
-    // Run Status Alert
-    const runAlert = document.getElementById("run-status-alert");
-    const runInfo = dashboardData.run_info || {};
+    // Header metadata tag
+    if (elActiveRunIdLabel) elActiveRunIdLabel.textContent = dashboardData.run_info?.run_id || activeRunId || "--";
+    if (elActiveRunTypeBadge) {
+      const isSingle = dashboardData.is_single_repo && dashboardData.single_repo;
+      elActiveRunTypeBadge.textContent = isSingle ? "Single Repository" : (dashboardData.run_info?.is_sample ? "Sample Dataset" : "Multi-Repository Cohort");
+    }
 
-    if (runAlert) {
+    // Diagnostic Alert (Failed, Empty, Malformed, Incomplete)
+    if (elRunStatusAlert) {
+      const runInfo = dashboardData.run_info || {};
       if (runInfo.status === "failed") {
-        runAlert.style.display = "block";
-        runAlert.style.background = "rgba(244, 63, 94, 0.14)";
-        runAlert.style.borderColor = "rgba(244, 63, 94, 0.4)";
+        elRunStatusAlert.style.display = "block";
+        elRunStatusAlert.style.borderColor = "var(--signal-red-border)";
+        elRunStatusAlert.style.background = "var(--signal-red-bg)";
         const errText = runInfo.errors && runInfo.errors.length ? runInfo.errors.join("; ") : "This analysis run did not finish successfully.";
-        runAlert.innerHTML = `<strong>⚠️ Pipeline Run Failed:</strong> ${escapeHtml(errText)}`;
+        elRunStatusAlert.innerHTML = `<strong>⚠ Pipeline Run Failed:</strong> ${escapeHtml(errText)}`;
       } else if (runInfo.status === "empty") {
-        runAlert.style.display = "block";
-        runAlert.style.background = "rgba(245, 158, 11, 0.14)";
-        runAlert.style.borderColor = "rgba(245, 158, 11, 0.4)";
-        runAlert.innerHTML = `<strong>ℹ Empty Run:</strong> This analysis directory contains no repository or commit artifact data.`;
+        elRunStatusAlert.style.display = "block";
+        elRunStatusAlert.style.borderColor = "var(--signal-amber-border)";
+        elRunStatusAlert.style.background = "var(--signal-amber-bg)";
+        elRunStatusAlert.innerHTML = `<strong>ℹ Empty Run:</strong> This analysis directory contains no repository or commit artifact data.`;
       } else if (runInfo.status === "malformed") {
-        runAlert.style.display = "block";
-        runAlert.style.background = "rgba(245, 158, 11, 0.14)";
-        runAlert.style.borderColor = "rgba(245, 158, 11, 0.4)";
-        runAlert.innerHTML = `<strong>⚠️ Malformed Manifest:</strong> The run manifest could not be decoded.`;
+        elRunStatusAlert.style.display = "block";
+        elRunStatusAlert.style.borderColor = "var(--signal-amber-border)";
+        elRunStatusAlert.style.background = "var(--signal-amber-bg)";
+        elRunStatusAlert.innerHTML = `<strong>⚠ Malformed Manifest:</strong> The run manifest could not be decoded.`;
       } else if (runInfo.status === "incomplete") {
-        runAlert.style.display = "block";
-        runAlert.style.background = "rgba(245, 158, 11, 0.14)";
-        runAlert.style.borderColor = "rgba(245, 158, 11, 0.4)";
-        runAlert.innerHTML = `<strong>ℹ Incomplete Run:</strong> This run directory is missing a completed pipeline manifest.`;
+        elRunStatusAlert.style.display = "block";
+        elRunStatusAlert.style.borderColor = "var(--signal-amber-border)";
+        elRunStatusAlert.style.background = "var(--signal-amber-bg)";
+        elRunStatusAlert.innerHTML = `<strong>ℹ Incomplete Run:</strong> This run directory is missing a completed pipeline manifest.`;
       } else {
-        runAlert.style.display = "none";
-        runAlert.innerHTML = "";
+        elRunStatusAlert.style.display = "none";
+        elRunStatusAlert.innerHTML = "";
       }
     }
 
@@ -390,14 +530,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================================================================
-  // 3. PROVENANCE BANNER
+  // 5. PROVENANCE BANNER
   // =========================================================================
 
   function renderProvenanceBanner() {
     const prov = dashboardData.provenance_notice || {};
-    const elBanner = document.getElementById("provenance-banner");
-    const elBannerText = document.getElementById("provenance-notice-text");
-    if (!elBanner || !elBannerText) return;
+    if (!elProvenanceBanner || !elProvenanceNoticeText) return;
 
     const runId = dashboardData.run_info?.run_id || "";
     let truncMsg = "";
@@ -405,32 +543,20 @@ document.addEventListener("DOMContentLoaded", () => {
       truncMsg = `<strong>Partial Sample Notice:</strong> ${escapeHtml(prov.truncated_notice)} `;
     }
 
+    const titleEl = document.getElementById("provenance-banner-title");
+
     if (prov.is_authentic_live) {
-      elBanner.style.background = "linear-gradient(90deg, rgba(16, 185, 129, 0.14) 0%, rgba(17, 24, 39, 0.75) 100%)";
-      elBanner.style.borderColor = "rgba(16, 185, 129, 0.4)";
-      const icon = elBanner.querySelector(".banner-icon");
-      if (icon) icon.textContent = "🛡️";
-      const h4 = elBanner.querySelector("h4");
-      if (h4) {
-        h4.textContent = `Authentic Live GitHub Run: ${runId}`;
-        h4.style.color = "#34d399";
-      }
-      elBannerText.innerHTML = `
+      elProvenanceBanner.style.borderLeftColor = "var(--signal-green)";
+      if (titleEl) titleEl.textContent = `Authentic Live GitHub Run: ${runId}`;
+      elProvenanceNoticeText.innerHTML = `
         <strong>100% Authentic Live Data:</strong> All commit statistics and diff metrics were retrieved directly from the live GitHub REST API.
         ${truncMsg}
         <strong>Unsupervised Clustering Notice:</strong> ${escapeHtml(prov.unsupervised_notice || "")}
       `;
     } else {
-      elBanner.style.background = "linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(17, 24, 39, 0.7) 100%)";
-      elBanner.style.borderColor = "rgba(245, 158, 11, 0.35)";
-      const icon = elBanner.querySelector(".banner-icon");
-      if (icon) icon.textContent = "⚠️";
-      const h4 = elBanner.querySelector("h4");
-      if (h4) {
-        h4.textContent = "Dataset Provenance & Quality Notice";
-        h4.style.color = "#fbbf24";
-      }
-      elBannerText.innerHTML = `
+      elProvenanceBanner.style.borderLeftColor = "var(--signal-amber)";
+      if (titleEl) titleEl.textContent = "Demonstration Sample: Provenance & Synthetic Data Notice";
+      elProvenanceNoticeText.innerHTML = `
         <strong>98.5% Synthetic Enrichment:</strong> 985 of the 1,000 sampled commit records were generated via deterministic mock mode (<code>--mock</code>) using SHA-256 hash seeds to exercise the data engineering pipeline without requiring live GitHub API quotas. Only 15 records reflect live GitHub API diff data.
         ${truncMsg}
         <strong>Unsupervised Clustering Notice:</strong> ${escapeHtml(prov.unsupervised_notice || "")}
@@ -439,7 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================================================================
-  // 4. SINGLE-REPOSITORY VIEWS & VISUALIZATIONS
+  // 6. SINGLE-REPOSITORY VIEWS & VISUALIZATIONS
   // =========================================================================
 
   function renderSingleRepoHeader() {
@@ -461,11 +587,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (elSingleCoverageBadge) {
       if (summary.is_truncated) {
-        elSingleCoverageBadge.className = "badge-truncated";
+        elSingleCoverageBadge.className = "badge-solid-amber";
         elSingleCoverageBadge.textContent = `Truncated (${summary.total_commits} of ${summary.requested_limit || "limit"})`;
       } else {
-        elSingleCoverageBadge.className = "meta-pill";
-        elSingleCoverageBadge.style.color = "#34d399";
+        elSingleCoverageBadge.className = "badge-solid-green";
         elSingleCoverageBadge.textContent = `✓ Complete History (${summary.total_commits} commits)`;
       }
     }
@@ -515,7 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Temporal Time-Series Chart (SVG)
+  // Temporal Time-Series Chart (Solid Signal Cobalt SVG)
   function renderSingleRepoTemporal() {
     const sr = dashboardData.single_repo;
     if (!sr || !elSingleTimeseriesSvg) return;
@@ -543,8 +668,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Chart dimensions
     const width = 1000;
-    const height = 260;
-    const margin = { top: 20, right: 30, bottom: 45, left: 50 };
+    const height = 240;
+    const margin = { top: 20, right: 30, bottom: 40, left: 50 };
     const chartW = width - margin.left - margin.right;
     const chartH = height - margin.top - margin.bottom;
 
@@ -567,7 +692,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return `
         <g class="chart-bar-group">
           <title>${label}: ${commits} commits, +${d.additions || 0} additions, -${d.deletions || 0} deletions</title>
-          <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="url(#cyanGrad)" rx="3" />
+          <rect x="${x}" y="${y}" width="${barWidth}" height="${barH}" fill="#2563eb" rx="2" />
           ${showLabel ? `
             <text x="${x + barWidth / 2}" y="${height - 12}" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="sans-serif">
               ${escapeHtml(label)}
@@ -582,19 +707,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const y = margin.top + chartH * (1 - ratio);
       const val = Math.round(maxCommits * ratio);
       return `
-        <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3 3" />
+        <line x1="${margin.left}" y1="${y}" x2="${width - margin.right}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3 3" />
         <text x="${margin.left - 8}" y="${y + 4}" fill="#64748b" font-size="10" text-anchor="end" font-family="sans-serif">${val}</text>
       `;
     }).join("");
 
     elSingleTimeseriesSvg.innerHTML = `
-      <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; overflow: visible;">
-        <defs>
-          <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#06b6d4" />
-            <stop offset="100%" stop-color="#0891b2" stop-opacity="0.8" />
-          </linearGradient>
-        </defs>
+      <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block;">
         ${gridLines}
         ${barsSvg}
       </svg>
@@ -608,7 +727,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const authors = sr.author_contributions || [];
     if (!authors.length) {
-      elSingleAuthorTableBody.innerHTML = `<tr><td colspan="8" class="empty-state">No author contributions available.</td></tr>`;
+      elSingleAuthorTableBody.innerHTML = `<tr><td colspan="8" class="empty-state-cell">No author contributions available.</td></tr>`;
       return;
     }
 
@@ -625,12 +744,12 @@ document.addEventListener("DOMContentLoaded", () => {
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-family: var(--font-mono); font-size: 0.75rem;">${a.percentage}%</span>
               <div style="width: 60px; height: 5px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden;">
-                <div style="width: ${a.percentage}%; height: 100%; background: var(--accent-cyan); border-radius: 99px;"></div>
+                <div style="width: ${a.percentage}%; height: 100%; background: #2563eb; border-radius: 99px;"></div>
               </div>
             </div>
           </td>
-          <td style="font-family: var(--font-mono); color: var(--accent-emerald);">+${Number(a.additions || 0).toLocaleString()}</td>
-          <td style="font-family: var(--font-mono); color: var(--accent-rose);">-${Number(a.deletions || 0).toLocaleString()}</td>
+          <td style="font-family: var(--font-mono); color: var(--signal-green);">+${Number(a.additions || 0).toLocaleString()}</td>
+          <td style="font-family: var(--font-mono); color: var(--signal-red);">-${Number(a.deletions || 0).toLocaleString()}</td>
           <td style="font-family: var(--font-mono);">${Number(a.lines_changed || 0).toLocaleString()}</td>
           <td style="font-family: var(--font-mono);">${a.merges || 0}</td>
           <td style="font-size: 0.75rem; color: var(--text-secondary);">${activeSpan}</td>
@@ -651,10 +770,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (sil != null && Number.isFinite(sil)) {
         elValCommitSilhouette.innerHTML = `
           ${sil.toFixed(4)}
-          <span class="badge-valid-silhouette" style="margin-left: 6px;">Valid</span>
+          <span class="badge-solid-green" style="margin-left: 6px;">Valid</span>
         `;
       } else {
-        elValCommitSilhouette.innerHTML = `<span class="badge-unavailable-silhouette">Skipped</span>`;
+        elValCommitSilhouette.innerHTML = `<span class="badge-solid">Skipped</span>`;
       }
     }
 
@@ -678,23 +797,23 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
           elCommitClusterCards.innerHTML = clusterKeys.map(k => {
             const p = profiles[k];
-            const color = CLUSTER_COLORS[k] || "#06b6d4";
+            const color = CLUSTER_COLORS[k] || "#2563eb";
             return `
               <div class="cluster-card" style="border-top: 3px solid ${color};">
-                <div class="cluster-card-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
                   <span class="cluster-badge" style="background: ${color}25; color: ${color}; border: 1px solid ${color}60;">
                     Commit Cluster ${k}
                   </span>
-                  <span class="cluster-repo-count">${p.count} commits</span>
+                  <span style="font-size: 0.75rem; color: var(--text-secondary);">${p.count} commits</span>
                 </div>
-                <div class="cluster-metric-list" style="margin-top: 10px;">
+                <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
                   <div class="cluster-metric-row">
                     <span>Avg Additions:</span>
-                    <strong style="color: var(--accent-emerald);">+${p.avg_additions}</strong>
+                    <strong style="color: var(--signal-green);">+${p.avg_additions}</strong>
                   </div>
                   <div class="cluster-metric-row">
                     <span>Avg Deletions:</span>
-                    <strong style="color: var(--accent-rose);">-${p.avg_deletions}</strong>
+                    <strong style="color: var(--signal-red);">-${p.avg_deletions}</strong>
                   </div>
                   <div class="cluster-metric-row">
                     <span>Avg Lines Changed:</span>
@@ -726,7 +845,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!files.length) {
       elSingleFilesTableBody.innerHTML = `
         <tr>
-          <td colspan="2" class="empty-state" style="padding: 20px;">
+          <td colspan="2" class="empty-state-cell" style="padding: 20px;">
             File-level change paths were not included in commit listings or no files were modified.
           </td>
         </tr>`;
@@ -803,23 +922,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (!records.length) {
-      elCommitsDetailTableBody.innerHTML = `<tr><td colspan="10" class="empty-state">No commits match current filters.</td></tr>`;
+      elCommitsDetailTableBody.innerHTML = `<tr><td colspan="10" class="empty-state-cell">No commits match current filters.</td></tr>`;
       return;
     }
 
     elCommitsDetailTableBody.innerHTML = records.map(c => {
       const dateStr = c.date ? c.date.replace("T", " ").replace("Z", "") : "--";
-      const addStr = c.additions != null ? `<span style="color: var(--accent-emerald);">+${c.additions}</span>` : `<span style="color: var(--text-muted);">N/A</span>`;
-      const delStr = c.deletions != null ? `<span style="color: var(--accent-rose);">-${c.deletions}</span>` : `<span style="color: var(--text-muted);">N/A</span>`;
+      const addStr = c.additions != null ? `<span style="color: var(--signal-green);">+${c.additions}</span>` : `<span style="color: var(--text-muted);">N/A</span>`;
+      const delStr = c.deletions != null ? `<span style="color: var(--signal-red);">-${c.deletions}</span>` : `<span style="color: var(--text-muted);">N/A</span>`;
       const linesStr = c.lines_changed != null ? c.lines_changed : "N/A";
       const filesStr = c.files_changed != null ? c.files_changed : "N/A";
 
       const mergeBadge = c.is_merge
-        ? `<span class="col-tag tag-desc" style="background: rgba(139, 92, 246, 0.2);">Merge</span>`
+        ? `<span class="badge-solid">Merge</span>`
         : `<span style="color: var(--text-muted); font-size: 0.75rem;">No</span>`;
 
       const clusterBadge = c.cluster != null
-        ? `<span class="col-tag tag-group" style="background: ${CLUSTER_COLORS[c.cluster] || '#10b981'}25; color: ${CLUSTER_COLORS[c.cluster] || '#34d399'};">C${c.cluster}</span>`
+        ? `<span class="cluster-badge" style="background: ${CLUSTER_COLORS[c.cluster] || '#2563eb'}25; color: ${CLUSTER_COLORS[c.cluster] || '#60a5fa'};">C${c.cluster}</span>`
         : `<span style="color: var(--text-muted); font-size: 0.75rem;">N/A</span>`;
 
       return `
@@ -840,7 +959,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================================================================
-  // 5. MULTI-REPOSITORY VIEWS & VISUALIZATIONS (EXISTING)
+  // 7. MULTI-REPOSITORY VIEWS & VISUALIZATIONS
   // =========================================================================
 
   function renderOverview() {
@@ -865,7 +984,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const metaCommits = document.getElementById("val-commits-meta");
     if (metaCommits) {
       if (ov.has_truncated_history) {
-        metaCommits.innerHTML = `<span style="color: #fbbf24;">Partial Sample (${ov.truncated_repositories_count} truncated)</span>`;
+        metaCommits.innerHTML = `<span style="color: var(--signal-amber);">Partial Sample (${ov.truncated_repositories_count} truncated)</span>`;
       } else {
         metaCommits.textContent = "Sampled commit history";
       }
@@ -874,11 +993,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const subEnriched = document.getElementById("val-enriched-sub");
     if (subEnriched && ov.total_enriched) {
       if (ov.synthetic_enriched === 0) {
-        subEnriched.innerHTML = `<span class="badge-authentic" title="Authentic GitHub API records">100% Real Live Data (${ov.authentic_enriched})</span>`;
+        subEnriched.innerHTML = `<span class="badge-solid-green" title="Authentic GitHub API records">100% Real Live Data (${ov.authentic_enriched})</span>`;
       } else {
         subEnriched.innerHTML = `
-          <span class="badge-authentic" title="Authentic GitHub API records">${ov.authentic_enriched} Real (${(ov.authentic_enriched / ov.total_enriched * 100).toFixed(1)}%)</span>
-          <span class="badge-synthetic" title="Deterministic mock-enriched records">${ov.synthetic_enriched} Mock (${ov.synthetic_percentage}%)</span>
+          <span class="badge-solid-green" title="Authentic GitHub API records">${ov.authentic_enriched} Real (${(ov.authentic_enriched / ov.total_enriched * 100).toFixed(1)}%)</span>
+          <span class="badge-solid-amber" title="Deterministic mock-enriched records">${ov.synthetic_enriched} Mock (${ov.synthetic_percentage}%)</span>
         `;
       }
     }
@@ -905,20 +1024,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const valSilMeasure = document.getElementById("val-silhouette-measure");
     if (valSil) {
       if (summary.stage_status === "skipped" || summary.skipped) {
-        valSil.innerHTML = `<span class="badge-unavailable-silhouette">Skipped</span>`;
+        valSil.innerHTML = `<span class="badge-solid">Skipped</span>`;
         if (valSilMeasure) {
           valSilMeasure.textContent = summary.stage_reason || "Clustering requires at least 2 repositories.";
         }
       } else if (summary.silhouette != null && Number.isFinite(summary.silhouette)) {
         valSil.innerHTML = `
           ${summary.silhouette.toFixed(4)}
-          <span class="badge-valid-silhouette" style="margin-left: 6px;">Valid</span>
+          <span class="badge-solid-green" style="margin-left: 6px;">Valid</span>
         `;
         if (valSilMeasure) {
           valSilMeasure.textContent = "Measure: Squared Euclidean Distance • Normalized Range: [-1.0, +1.0]";
         }
       } else {
-        valSil.innerHTML = `<span class="badge-unavailable-silhouette">N/A</span>`;
+        valSil.innerHTML = `<span class="badge-solid">N/A</span>`;
       }
     }
 
@@ -926,31 +1045,31 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (summary.stage_status === "skipped" || summary.skipped) {
       elClusterCards.innerHTML = `
-        <div style="grid-column: 1 / -1; padding: 20px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); color: #fde68a;">
+        <div style="grid-column: 1 / -1; padding: 14px 18px; background: var(--panel-inset); border: 1px solid var(--signal-amber-border); border-radius: var(--radius-sm); color: #fde68a;">
           <strong>ℹ Clustering Skipped:</strong> ${escapeHtml(summary.stage_reason || "Requires at least 2 repositories.")}
         </div>`;
       return;
     }
 
     if (!clusterIds.length) {
-      elClusterCards.innerHTML = `<div class="empty-state">No cluster profiles available</div>`;
+      elClusterCards.innerHTML = `<div class="empty-state-cell">No cluster profiles available</div>`;
       return;
     }
 
     elClusterCards.innerHTML = clusterIds.map(cid => {
       const p = profiles[cid] || {};
       const isSelected = activeClusterFilter === String(cid);
-      const color = CLUSTER_COLORS[cid] || "#06b6d4";
+      const color = CLUSTER_COLORS[cid] || "#2563eb";
 
       return `
         <div class="cluster-card ${isSelected ? 'selected' : ''}" data-cluster="${cid}" style="border-top: 3px solid ${color};">
-          <div class="cluster-card-header">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="cluster-badge" style="background: ${color}25; color: ${color}; border: 1px solid ${color}60;">
               Cluster ${cid}
             </span>
-            <span class="cluster-repo-count">${p.count || 0} repositories</span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">${p.count || 0} repositories</span>
           </div>
-          <div class="cluster-metric-list">
+          <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px;">
             <div class="cluster-metric-row">
               <span>Avg Additions:</span>
               <strong>${p.avg_additions != null ? Number(p.avg_additions).toLocaleString() : '--'}</strong>
@@ -1017,7 +1136,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const width = 800;
     const height = 200;
-    const padding = { top: 20, right: 20, bottom: 40, left: 110 };
+    const padding = { top: 20, right: 20, bottom: 30, left: 110 };
     const chartW = width - padding.left - padding.right;
     const chartH = height - padding.top - padding.bottom;
 
@@ -1051,7 +1170,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const val = profiles[cid]?.[m.key] || 0;
         const normWidth = (val / metricMax[m.key]) * chartW;
         const barY = groupY + (groupHeight - (numClusters * barHeight)) / 2 + cIdx * barHeight;
-        const color = CLUSTER_COLORS[cid] || "#06b6d4";
+        const color = CLUSTER_COLORS[cid] || "#2563eb";
 
         barsSvg += `
           <rect x="${padding.left}" y="${barY}" width="${Math.max(2, normWidth)}" height="${barHeight - 2}" fill="${color}" rx="2">
@@ -1069,10 +1188,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (elChartLegend) {
       elChartLegend.innerHTML = clusterIds.map(cid => {
-        const color = CLUSTER_COLORS[cid] || "#06b6d4";
+        const color = CLUSTER_COLORS[cid] || "#2563eb";
         return `
-          <div class="legend-item">
-            <span class="legend-color-dot" style="background: ${color};"></span>
+          <div class="legend-badge">
+            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
             <span>Cluster ${cid}</span>
           </div>
         `;
@@ -1131,7 +1250,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (!repos.length) {
-      elTableBody.innerHTML = `<tr><td colspan="11" class="empty-state">No repositories match active filters.</td></tr>`;
+      elTableBody.innerHTML = `<tr><td colspan="11" class="empty-state-cell">No repositories match active filters.</td></tr>`;
       return;
     }
 
@@ -1139,10 +1258,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const cid = r.cluster;
       const color = CLUSTER_COLORS[cid] || "#94a3b8";
       const clusterBadge = cid != null
-        ? `<span class="col-tag tag-group" style="background: ${color}25; color: ${color};">Cluster ${cid}</span>`
+        ? `<span class="cluster-badge" style="background: ${color}25; color: ${color};">Cluster ${cid}</span>`
         : `<span style="color: var(--text-muted); font-size: 0.75rem;">N/A</span>`;
 
-      const truncBadge = r.is_truncated ? `<span class="badge-truncated" title="Truncated at limit">Truncated</span>` : "";
+      const truncBadge = r.is_truncated ? `<span class="badge-solid-amber" style="margin-left: 6px;">Truncated</span>` : "";
 
       return `
         <tr>
@@ -1152,7 +1271,7 @@ document.addEventListener("DOMContentLoaded", () => {
             </a>
             ${truncBadge}
           </td>
-          <td>${r.language ? `<span class="meta-pill">${escapeHtml(r.language)}</span>` : '<span style="color: var(--text-muted);">--</span>'}</td>
+          <td>${r.language ? `<span class="badge-solid">${escapeHtml(r.language)}</span>` : '<span style="color: var(--text-muted);">--</span>'}</td>
           <td style="font-family: var(--font-mono);">${r.stars != null ? Number(r.stars).toLocaleString() : '--'}</td>
           <td style="font-family: var(--font-mono); font-weight: 600;">${r.commit_count != null ? r.commit_count : '--'}</td>
           <td style="font-family: var(--font-mono);">${r.distinct_authors != null ? r.distinct_authors : '--'}</td>
@@ -1196,33 +1315,56 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     elFlowContainer.innerHTML = stages.map(s => `
-      <div class="stage-card">
-        <div class="stage-num">${s.num}</div>
-        <div class="stage-title">${s.title}</div>
-        <div class="stage-artifact">${s.artifact}</div>
-        <div class="stage-status" style="color: ${s.ready ? '#34d399' : '#f87171'};">
+      <div class="flow-node">
+        <span style="font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase;">${s.num}</span>
+        <div class="flow-node-title">${s.title}</div>
+        <div class="flow-node-path">${s.artifact}</div>
+        <div class="flow-node-status" style="color: ${s.ready ? 'var(--signal-green)' : (s.meta.includes('Skipped') ? 'var(--signal-amber)' : 'var(--signal-red)')};">
           <span>${s.ready ? '✓' : (s.meta.includes('Skipped') ? 'ℹ' : '✗')}</span>
           <span>${s.ready ? 'Verified & Loaded' : (s.meta.includes('Skipped') ? 'Skipped Safeguard' : 'Missing')}</span>
         </div>
-        <div style="font-size: 0.6875rem; color: var(--text-muted); margin-top: 4px;">${s.meta}</div>
+        <div style="font-size: 0.6875rem; color: var(--text-muted); margin-top: 2px;">${s.meta}</div>
       </div>
     `).join("");
   }
 
   // =========================================================================
-  // 6. EVENT LISTENERS
+  // 8. GLOBAL EVENT LISTENERS
   // =========================================================================
 
-  if (elSelectActiveRun) {
-    elSelectActiveRun.addEventListener("change", (e) => {
-      loadData(e.target.value);
+  // Navigation Links
+  if (elBrandLink) elBrandLink.addEventListener("click", (e) => { e.preventDefault(); returnToLanding(); });
+  if (elNavBtnNewAnalysis) elNavBtnNewAnalysis.addEventListener("click", () => returnToLanding());
+  if (elBtnBackToLanding) elBtnBackToLanding.addEventListener("click", () => returnToLanding());
+  if (elBtnCancelProgress) elBtnCancelProgress.addEventListener("click", () => returnToLanding());
+  if (elBtnRetryAnalysis) elBtnRetryAnalysis.addEventListener("click", () => returnToLanding());
+
+  // Demo Sample Callout Button
+  if (elBtnLoadDemoSample) {
+    elBtnLoadDemoSample.addEventListener("click", () => {
+      loadRunAndDisplay("sample");
     });
   }
 
+  // Active Run Selector Dropdown
+  if (elSelectActiveRun) {
+    elSelectActiveRun.addEventListener("change", (e) => {
+      const selectedRun = e.target.value;
+      if (!selectedRun) {
+        returnToLanding();
+      } else {
+        loadRunAndDisplay(selectedRun);
+      }
+    });
+  }
+
+  // Refresh Button
   if (elBtnRefresh) {
-    elBtnRefresh.addEventListener("click", () => {
-      loadRuns();
-      loadData();
+    elBtnRefresh.addEventListener("click", async () => {
+      await loadRuns();
+      if (activeRunId) {
+        await loadData(activeRunId);
+      }
     });
   }
 
@@ -1359,12 +1501,13 @@ document.addEventListener("DOMContentLoaded", () => {
     window.open(`/api/export?run=${encodeURIComponent(runId)}&format=${encodeURIComponent(format)}`, "_blank");
   }
 
-  if (elBtnExportCommitsCsv) elBtnExportCommitsCsv.addEventListener("click", () => triggerExport("csv"));
-  if (elBtnExportRepoJson) elBtnExportRepoJson.addEventListener("click", () => triggerExport("json"));
-  if (elBtnExportMultiCsv) elBtnExportMultiCsv.addEventListener("click", () => triggerExport("csv"));
-  if (elBtnExportMultiJson) elBtnExportMultiJson.addEventListener("click", () => triggerExport("json"));
+  if (elBtnExportCsv) elBtnExportCsv.addEventListener("click", () => triggerExport("csv"));
+  if (elBtnExportJson) elBtnExportJson.addEventListener("click", () => triggerExport("json"));
 
-  // Helpers
+  // =========================================================================
+  // 9. STRING & FORMATTING UTILITIES
+  // =========================================================================
+
   function escapeHtml(str) {
     if (str == null) return "";
     return String(str)
@@ -1380,6 +1523,23 @@ document.addEventListener("DOMContentLoaded", () => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
+  function formatTimestamp(isoStr) {
+    if (!isoStr) return "--";
+    try {
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return isoStr;
+      return d.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return isoStr;
+    }
+  }
+
   function jsonStringifySafe(obj) {
     try {
       return JSON.stringify(obj);
@@ -1388,7 +1548,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Initial load
+  // =========================================================================
+  // INITIALIZATION (DEFAULT LANDING STATE)
+  // =========================================================================
+  // Ensure we show View 1 (Landing) by default without auto-fetching sample data!
+  showView("landing");
   loadRuns();
-  loadData();
 });

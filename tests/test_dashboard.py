@@ -301,5 +301,77 @@ class TestSingleRepoAnalyticsLogic:
         assert "N/A" in csv_str  # Missing stats output as N/A
 
 
+
+# ===========================================================================
+# 5. DASHBOARD DEFAULT STATE & REDESIGN TESTS
+# ===========================================================================
+
+class TestDashboardDefaultStateAndRedesign:
+    def test_default_html_landing_state(self):
+        html_path = PROJECT_ROOT / "dashboard" / "index.html"
+        assert html_path.exists()
+        content = html_path.read_text(encoding="utf-8")
+
+        # Landing view is default visible, progress and results views are hidden
+        assert 'id="landing-view"' in content
+        assert 'id="landing-view" class="view-panel" style="display: block;"' in content
+        assert 'id="progress-view" class="view-panel" style="display: none;"' in content
+        assert 'id="results-view" class="view-panel" style="display: none;"' in content
+
+        # Required landing controls exist
+        assert 'id="input-repo-url"' in content
+        assert 'id="btn-start-analysis"' in content
+        assert 'id="radio-mode-limit"' in content
+        assert 'id="radio-mode-full"' in content
+        assert 'id="input-commit-limit"' in content
+
+        # Capabilities grid exists
+        assert 'class="capabilities-grid"' in content
+        assert "Commit Velocity" in content
+        assert "Line Churn" in content
+        assert "Author Contributions" in content
+        assert "Modification Hotspots" in content
+        assert "MapReduce Feature Extraction" in content
+        assert "Spark MLlib K-Means" in content
+
+        # Previous Runs container & distinct Demonstration Sample button exist
+        assert 'id="previous-runs-container"' in content
+        assert 'id="previous-runs-empty-state"' in content
+        assert 'id="btn-load-demo-sample"' in content
+
+    def test_app_js_default_state_not_preloaded(self):
+        js_path = PROJECT_ROOT / "dashboard" / "app.js"
+        assert js_path.exists()
+        content = js_path.read_text(encoding="utf-8")
+
+        # activeRunId is initially null, NOT hardcoded to 'sample'
+        assert "let activeRunId = null;" in content
+        # Initial load invokes showView('landing') and loadRuns()
+        assert 'showView("landing");' in content
+        assert "loadRuns();" in content
+        # Sample data is filtered out of real previous runs
+        assert "runsList.filter(r => !r.is_sample)" in content
+        # Demonstration sample button explicitly loads sample
+        assert 'loadRunAndDisplay("sample");' in content
+
+    def test_style_css_graphite_and_signal_palette(self):
+        css_path = PROJECT_ROOT / "dashboard" / "style.css"
+        assert css_path.exists()
+        content = css_path.read_text(encoding="utf-8")
+
+        # Palette tokens
+        assert "--canvas-bg: #0b0f19;" in content
+        assert "--panel-bg: #111827;" in content
+        assert "--cobalt-primary: #2563eb;" in content
+        assert "--signal-green: #10b981;" in content
+        assert "--signal-amber: #f59e0b;" in content
+        assert "--signal-red: #ef4444;" in content
+
+        # No radial-gradient or glassmorphism on body
+        assert "radial-gradient" not in content
+        assert "backdrop-filter" not in content
+
+
 def math_close(a, b, tol=0.1):
     return abs(a - b) <= tol
+

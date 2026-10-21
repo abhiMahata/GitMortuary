@@ -1,0 +1,84 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T054404Z-e3c2e360",
+  "repository": "abhiMahata/phonectl",
+  "repository_url": "https://github.com/abhiMahata/phonectl",
+  "started_at": "2026-10-21T05:44:04.944447+00:00",
+  "completed_at": "2026-10-21T05:44:06.341246+00:00",
+  "duration_seconds": 1.4,
+  "status": "complete",
+  "history_mode": "recent_limit",
+  "commit_limit": 10,
+  "requested_limit": 10,
+  "date_range": {
+    "earliest": "2026-10-18T07:07:57Z",
+    "latest": "2026-10-18T10:54:05Z"
+  },
+  "completeness": {
+    "is_complete": true,
+    "truncated_by_limit": false,
+    "has_more_commits": false,
+    "total_commits_fetched": 3
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 3,
+    "enriched_commits": 3,
+    "authentic_records": 3,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 54,
+    "reset_timestamp": 1792565044
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [],
+  "errors": [],
+  "analysis_id": "analysis-20261021T054404Z-e3c2e360",
+  "type": "orchestrated_analysis",
+  "repositories_requested": [
+    "abhiMahata/phonectl"
+  ],
+  "stages": {
+    "ingestion": {
+      "status": "complete",
+      "repositories_attempted": 1,
+      "repositories_succeeded": 1,
+      "repositories_failed": 0,
+      "runs": [
+        {
+          "repository": "abhiMahata/phonectl",
+          "status": "complete",
+          "commits": 3,
+          "enriched": 3,
+          "directory": "repositories/abhiMahata_phonectl"
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "success",
+      "mode": "local_streaming",
+      "features_count": 1,
+      "output_file": "repo_features.jsonl"
+    },
+    "spark": {
+      "status": "success",
+      "reason": "",
+      "k": 2,
+      "seed": 42,
+      "silhouette": 0.5222,
+      "silhouette_status": "valid",
+      "silhouette_reason": "Standard squared Euclidean silhouette in range [-1.0, 1.0].",
+      "distance_measure": "squaredEuclidean",
+      "target": "commit_level_clustering",
+      "output_file": "commit_clusters.json"
+    }
+  }
+}

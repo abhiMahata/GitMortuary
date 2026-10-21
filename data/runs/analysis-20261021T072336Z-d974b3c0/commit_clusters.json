@@ -1,0 +1,77 @@
+{
+  "status": "success",
+  "reason": "",
+  "k": 3,
+  "seed": 42,
+  "silhouette": -0.4211,
+  "distance_measure": "squaredEuclidean",
+  "profiles": {
+    "0": {
+      "cluster_id": 0,
+      "label": "Routine Feature & Bug Fix Commits",
+      "count": 20,
+      "percentage": 83.3,
+      "avg_additions": 75.8,
+      "avg_deletions": 2.5,
+      "avg_lines_changed": 78.2,
+      "avg_files_changed": 1.2,
+      "merge_ratio": 0.05
+    },
+    "1": {
+      "cluster_id": 1,
+      "label": "Major Refactorings & Large Churn",
+      "count": 3,
+      "percentage": 12.5,
+      "avg_additions": 6147.0,
+      "avg_deletions": 235.0,
+      "avg_lines_changed": 6382.0,
+      "avg_files_changed": 60.7,
+      "merge_ratio": 0.0
+    },
+    "2": {
+      "cluster_id": 2,
+      "label": "Routine Feature & Bug Fix Commits",
+      "count": 1,
+      "percentage": 4.2,
+      "avg_additions": 362.0,
+      "avg_deletions": 0.0,
+      "avg_lines_changed": 362.0,
+      "avg_files_changed": 14.0,
+      "merge_ratio": 0.0
+    }
+  },
+  "assignments": {
+    "eec01345f1e8dfb45866954a34933f45fa515544": 2,
+    "0d5ceeaf06de9d53085d177c699a63119da00619": 1,
+    "fe6e3dc921cb71294a7a44683459c73e34c42c02": 1,
+    "468a5255efa7f99ab188241076b0d21d1afd9243": 1,
+    "3cd43b54485c611c941da9cad34706e467b2ba87": 0,
+    "26e0a97bda1054e84dd838615e5b2496f130927b": 0,
+    "76d7015dc4435d1927a38c0a0244e467ee91994c": 0,
+    "245d772de3af5aa083e96207c6ad3fe6809a5ca3": 0,
+    "b1e59eaaad38ed17333d26e1bdae5b8ab9754ce0": 0,
+    "a6b63b869f364004db112319048b161cb0113057": 0,
+    "b2b0a3f43c9a25949b36a1888e706be54785f2bf": 0,
+    "5def397d814e1a06baff7fd0090a7f731d933b9f": 0,
+    "0a9e2afa82f4c73444f745d18d8aafac03caa846": 0,
+    "17e4dfb9cecc53ecbeef5c237a0618f58bb301f4": 0,
+    "ea39d2ad21807f38f33304633eeceb4368a5a859": 0,
+    "be92977f001cd2a39929d9c69be5612d1604b7ec": 0,
+    "fce7d2407f6132af1f063f6d7449d161142dab9f": 0,
+    "b918bae7f52c0ead252ffceb3b3da2b20cbfe40a": 0,
+    "68d7aa338d0612fe6c857a2c47f115b5c2c640aa": 0,
+    "dadbf7a65a7f0b9209f16131c12f1ba609692789": 0,
+    "a418ab8bcc665e9c1306c680001182d7ef6384a0": 0,
+    "048e78079d404851231274b383842dffef87c121": 0,
+    "9df2c024ccfaab097494c0bd23bd7a1a9d6e94f1": 0,
+    "f9cfc2a740ee74cabbaf81406383e3506b72f861": 0
+  },
+  "valid_commits_count": 24,
+  "feature_columns": [
+    "additions",
+    "deletions",
+    "lines_changed",
+    "files_changed",
+    "parent_count"
+  ]
+}
