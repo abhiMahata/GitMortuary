@@ -1,0 +1,89 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T142049Z-7419747b",
+  "repository": "abhiMahata/GitMortuary",
+  "repository_url": "https://github.com/abhiMahata/GitMortuary",
+  "started_at": "2026-10-21T14:20:49.816752+00:00",
+  "completed_at": "2026-10-21T14:20:55.091850+00:00",
+  "duration_seconds": 5.28,
+  "status": "truncated",
+  "history_mode": "recent_limit",
+  "commit_limit": 10,
+  "requested_limit": 10,
+  "date_range": {
+    "earliest": "2026-09-24T18:20:53Z",
+    "latest": "2026-10-21T14:04:12Z"
+  },
+  "completeness": {
+    "is_complete": false,
+    "truncated_by_limit": true,
+    "has_more_commits": true,
+    "total_commits_fetched": 10
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 10,
+    "enriched_commits": 10,
+    "authentic_records": 10,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 18,
+    "reset_timestamp": 1792595569
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [
+    "History truncated by commit limit (10). Repository contains additional commits."
+  ],
+  "errors": [],
+  "analysis_id": "analysis-20261021T142049Z-7419747b",
+  "type": "orchestrated_analysis",
+  "repositories_requested": [
+    "abhiMahata/GitMortuary"
+  ],
+  "stages": {
+    "ingestion": {
+      "status": "truncated",
+      "repositories_attempted": 1,
+      "repositories_succeeded": 1,
+      "repositories_failed": 0,
+      "runs": [
+        {
+          "repository": "abhiMahata/GitMortuary",
+          "status": "truncated",
+          "commits": 10,
+          "enriched": 10,
+          "directory": "repositories/abhiMahata_GitMortuary"
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "success",
+      "mode": "local_streaming",
+      "features_count": 1,
+      "output_file": "repo_features.jsonl",
+      "requested_mode": "local",
+      "fallback_applied": false,
+      "diagnostic": null
+    },
+    "spark": {
+      "status": "success",
+      "reason": "",
+      "k": 3,
+      "seed": 42,
+      "silhouette": 0.9243,
+      "silhouette_status": "valid",
+      "silhouette_reason": "Standard squared Euclidean silhouette in range [-1.0, 1.0].",
+      "distance_measure": "squaredEuclidean",
+      "target": "commit_level_clustering",
+      "output_file": "commit_clusters.json"
+    }
+  }
+}

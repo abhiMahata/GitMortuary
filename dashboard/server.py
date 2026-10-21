@@ -570,10 +570,12 @@ def _run_analysis_worker(
         manager.update_task(run_id, "ingestion", f"Starting ingestion for {repository}...", 15)
 
         # Step 1: Run ingestion
+        active_token = os.environ.get("GITHUB_TOKEN") or GITHUB_TOKEN
         manifest = analyze_repository(
             identifier=repository,
             output_dir=target_dir,
             commit_limit=limit,
+            token=active_token,
             on_progress=on_ingest_progress,
         )
 
@@ -581,7 +583,16 @@ def _run_analysis_worker(
         features_file = target_dir / "repo_features.jsonl"
 
         # Step 2: MapReduce feature aggregation
-        manager.update_task(run_id, "mapreduce", "Aggregating repository features via MapReduce...", 75)
+        if use_hadoop:
+            manager.update_task(
+                run_id,
+                "mapreduce",
+                "Hadoop cluster not running in standalone environment; executing local MapReduce streaming fallback...",
+                75,
+            )
+        else:
+            manager.update_task(run_id, "mapreduce", "Aggregating repository features via MapReduce...", 75)
+
         features_count = 0
         if enriched_file.exists() and enriched_file.stat().st_size > 0:
             features_count = execute_local_mapreduce(enriched_file, features_file)
@@ -621,6 +632,12 @@ def _run_analysis_worker(
                 "mode": "local_streaming",
                 "features_count": features_count,
                 "output_file": "repo_features.jsonl",
+                "requested_mode": "hadoop" if use_hadoop else "local",
+                "fallback_applied": bool(use_hadoop),
+                "diagnostic": (
+                    "Distributed Hadoop/HDFS cluster is not active in this standalone container environment; "
+                    "features aggregated via verified local MapReduce streaming."
+                ) if use_hadoop else None,
             },
             "spark": {
                 "status": "success" if clustering_result.get("status") == "success" else "skipped",
@@ -1025,7 +1042,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     commit_limit = 10
 
             # Pre-validate repository existence via GitHubClient before spinning up run
-            client = GitHubClient(token=GITHUB_TOKEN)
+            active_token = os.environ.get("GITHUB_TOKEN") or GITHUB_TOKEN
+            client = GitHubClient(token=active_token)
             try:
                 client.get_repository(owner, repo_name)
             except RepositoryNotFoundError as exc:
@@ -1305,9 +1323,11 @@ def run_server(host: str = "127.0.0.1", port: int = 8050):
 
 
 def main():
+    default_host = os.environ.get("HOST", "127.0.0.1")
+    default_port = int(os.environ.get("PORT", "8050"))
     parser = argparse.ArgumentParser(description="Git Pattern Analysis Web Dashboard")
-    parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=8050, help="Port to listen on (default: 8050)")
+    parser.add_argument("--host", default=default_host, help=f"Host interface to bind (default: {default_host})")
+    parser.add_argument("--port", type=int, default=default_port, help=f"Port to listen on (default: {default_port})")
     parser.add_argument("--check-only", action="store_true", help="Validate data loading without starting web server")
     args = parser.parse_args()
 

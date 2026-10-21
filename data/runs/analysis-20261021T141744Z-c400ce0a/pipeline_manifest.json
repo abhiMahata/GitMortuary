@@ -1,0 +1,84 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T141744Z-c400ce0a",
+  "repository": "abhiMahata/two-tier-flask-app",
+  "repository_url": "https://github.com/abhiMahata/two-tier-flask-app",
+  "started_at": "2026-10-21T14:17:44.954924+00:00",
+  "completed_at": "2026-10-21T14:17:50.771017+00:00",
+  "duration_seconds": 5.82,
+  "status": "complete",
+  "history_mode": "full_history",
+  "commit_limit": null,
+  "requested_limit": "all",
+  "date_range": {
+    "earliest": "2026-05-03T09:55:01Z",
+    "latest": "2026-05-05T09:02:53Z"
+  },
+  "completeness": {
+    "is_complete": true,
+    "truncated_by_limit": false,
+    "has_more_commits": false,
+    "total_commits_fetched": 12
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 12,
+    "enriched_commits": 12,
+    "authentic_records": 12,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 44,
+    "reset_timestamp": 1792595569
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [],
+  "errors": [],
+  "analysis_id": "analysis-20261021T141744Z-c400ce0a",
+  "type": "orchestrated_analysis",
+  "repositories_requested": [
+    "abhiMahata/two-tier-flask-app"
+  ],
+  "stages": {
+    "ingestion": {
+      "status": "complete",
+      "repositories_attempted": 1,
+      "repositories_succeeded": 1,
+      "repositories_failed": 0,
+      "runs": [
+        {
+          "repository": "abhiMahata/two-tier-flask-app",
+          "status": "complete",
+          "commits": 12,
+          "enriched": 12,
+          "directory": "repositories/abhiMahata_two-tier-flask-app"
+        }
+      ]
+    },
+    "mapreduce": {
+      "status": "success",
+      "mode": "local_streaming",
+      "features_count": 1,
+      "output_file": "repo_features.jsonl"
+    },
+    "spark": {
+      "status": "success",
+      "reason": "",
+      "k": 3,
+      "seed": 42,
+      "silhouette": 0.2987,
+      "silhouette_status": "valid",
+      "silhouette_reason": "Standard squared Euclidean silhouette in range [-1.0, 1.0].",
+      "distance_measure": "squaredEuclidean",
+      "target": "commit_level_clustering",
+      "output_file": "commit_clusters.json"
+    }
+  }
+}

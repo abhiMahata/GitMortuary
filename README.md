@@ -1,3 +1,14 @@
+---
+title: Git Pattern Analysis
+emoji: 🐙
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Repository intelligence, commit metrics, and K-Means clustering
+---
+
 # Git Pattern Analysis
 
 Analyzes GitHub commit history to extract repository-level development patterns using a data engineering pipeline: **GitHub API → HDFS → Hadoop MapReduce → Hive → Apache Spark MLlib → Web Dashboard**.

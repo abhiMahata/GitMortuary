@@ -1,0 +1,46 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T142120Z-b9158e90",
+  "repository": "abhiMahata/GitMortuary",
+  "repository_url": "https://github.com/abhiMahata/GitMortuary",
+  "started_at": "2026-10-21T14:21:20.827793+00:00",
+  "completed_at": "2026-10-21T14:21:23.473977+00:00",
+  "duration_seconds": 2.65,
+  "status": "truncated",
+  "history_mode": "full_history",
+  "commit_limit": null,
+  "requested_limit": "all",
+  "date_range": {
+    "earliest": "2026-09-16T18:23:41Z",
+    "latest": "2026-10-21T14:04:12Z"
+  },
+  "completeness": {
+    "is_complete": false,
+    "truncated_by_limit": true,
+    "has_more_commits": false,
+    "total_commits_fetched": 25
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 25,
+    "enriched_commits": 25,
+    "authentic_records": 25,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 1,
+    "reset_timestamp": 1792595569
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [
+    "Rate limit nearly exhausted (1 requests remaining). Halting per-commit enrichment to protect quota."
+  ],
+  "errors": []
+}

@@ -1,0 +1,56 @@
+{
+  "status": "success",
+  "reason": "",
+  "k": 3,
+  "seed": 42,
+  "silhouette": 0.8233,
+  "distance_measure": "squaredEuclidean",
+  "profiles": {
+    "1": {
+      "cluster_id": 1,
+      "label": "Routine Feature & Bug Fix Commits",
+      "count": 10,
+      "percentage": 71.4,
+      "avg_additions": 179.0,
+      "avg_deletions": 4.3,
+      "avg_lines_changed": 183.3,
+      "avg_files_changed": 2.9,
+      "merge_ratio": 0.0
+    },
+    "2": {
+      "cluster_id": 2,
+      "label": "Major Refactorings & Large Churn",
+      "count": 4,
+      "percentage": 28.6,
+      "avg_additions": 5267.8,
+      "avg_deletions": 568.0,
+      "avg_lines_changed": 5835.8,
+      "avg_files_changed": 50.0,
+      "merge_ratio": 0.0
+    }
+  },
+  "assignments": {
+    "92d03936c49ef4d69547acfe4a06d6d54a95f88a": 2,
+    "eec01345f1e8dfb45866954a34933f45fa515544": 1,
+    "0d5ceeaf06de9d53085d177c699a63119da00619": 2,
+    "fe6e3dc921cb71294a7a44683459c73e34c42c02": 2,
+    "468a5255efa7f99ab188241076b0d21d1afd9243": 2,
+    "3cd43b54485c611c941da9cad34706e467b2ba87": 1,
+    "26e0a97bda1054e84dd838615e5b2496f130927b": 1,
+    "76d7015dc4435d1927a38c0a0244e467ee91994c": 1,
+    "245d772de3af5aa083e96207c6ad3fe6809a5ca3": 1,
+    "b1e59eaaad38ed17333d26e1bdae5b8ab9754ce0": 1,
+    "a6b63b869f364004db112319048b161cb0113057": 1,
+    "b2b0a3f43c9a25949b36a1888e706be54785f2bf": 1,
+    "5def397d814e1a06baff7fd0090a7f731d933b9f": 1,
+    "0a9e2afa82f4c73444f745d18d8aafac03caa846": 1
+  },
+  "valid_commits_count": 14,
+  "feature_columns": [
+    "additions",
+    "deletions",
+    "lines_changed",
+    "files_changed",
+    "parent_count"
+  ]
+}
