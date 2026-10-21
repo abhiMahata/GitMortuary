@@ -1,0 +1,44 @@
+{
+  "manifest_version": "1.0",
+  "run_id": "analysis-20261021T051439Z-74129e61",
+  "repository": "abhiMahata/phonectl",
+  "repository_url": "https://github.com/abhiMahata/phonectl",
+  "started_at": "2026-10-21T05:14:39.885951+00:00",
+  "completed_at": "2026-10-21T05:14:42.222628+00:00",
+  "duration_seconds": 2.34,
+  "status": "complete",
+  "history_mode": "recent_limit",
+  "commit_limit": 10,
+  "requested_limit": 10,
+  "date_range": {
+    "earliest": "2026-10-18T07:07:57Z",
+    "latest": "2026-10-18T10:54:05Z"
+  },
+  "completeness": {
+    "is_complete": true,
+    "truncated_by_limit": false,
+    "has_more_commits": false,
+    "total_commits_fetched": 3
+  },
+  "counts": {
+    "repositories": 1,
+    "commits": 3,
+    "enriched_commits": 3,
+    "authentic_records": 3,
+    "synthetic_records": 0
+  },
+  "rate_limit": {
+    "authenticated": false,
+    "limit": 60,
+    "remaining": 52,
+    "reset_timestamp": 1792560761
+  },
+  "files": {
+    "repositories": "repositories.jsonl",
+    "commits": "commits.jsonl",
+    "enriched_commits": "enriched_commits.jsonl",
+    "manifest": "manifest.json"
+  },
+  "warnings": [],
+  "errors": []
+}
